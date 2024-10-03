@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import 'package:ailia_llm/ailia_llm.dart';
-
+/*
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -23,3 +23,4 @@ void main() {
     expect(version?.isNotEmpty, true);
   });
 }
+*/

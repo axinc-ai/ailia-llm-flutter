@@ -1,6 +1,6 @@
 name: ailia_llm
-description: "A new Flutter plugin project."
-version: 0.0.1
+description: "ailia LLM for Flutter"
+version: 1.0.0
 homepage:
 
 environment:
@@ -11,6 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   plugin_platform_interface: ^2.0.2
+  ffi:
 
 dev_dependencies:
   flutter_test:
