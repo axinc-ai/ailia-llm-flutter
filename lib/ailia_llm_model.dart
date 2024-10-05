@@ -32,26 +32,57 @@ DynamicLibrary _ailiaCommonGetLibrary(String path) {
   return library;
 }
 
-enum AiliaLlmInferenceStatus {
-  success,
-}
-
-class AiliaLlmInferenceState {
-  AiliaLLm ailiaLlm;
+class AiliaLLMModel {
+  Pointer<Pointer<ailia_llm_dart.AILIALLM>> pLLm = nullptr;
   dynamic dllHandle;
 
-  AiliaLlmInferenceState(this.ailiaLlm) {
+  AiliaLLMModel() {
     dllHandle = ailia_llm_dart.ailiaLlmFFI(_ailiaCommonGetLibrary(_ailiaCommonGetLlmPath()));
   }
 
+  /// Initialize the context using the given model and parameters.
+  void open(String modelPath, int nCtx) {
+    if (pLLm != nullptr) {
+      if (pLLm.value != nullptr) {
+        dllHandle.ailiaLLMDestory(pLLm.value);
+      }
+    }
+
+    pLLm = malloc<Pointer<ailia_llm_dart.AILIALLM>>();
+    pLLm.value = nullptr;
+
+    var status = dllHandle.ailiaLLMCreate(pLLm, nCtx);
+    if (status != 0) {
+      throw Exception("ailiaLLMCreate returned an error status $status");
+    }
+
+    if (Platform.isWindows) {
+      status = dllHandle.ailiaLLMOpenModelFileW(
+          pLLm.value, modelPath.toNativeUtf16().cast<WChar>());
+    } else {
+      status = dllHandle.ailiaLLMOpenModelFileA(
+          pLLm.value, modelPath.toNativeUtf8().cast<Char>());
+    }
+    if (status != 0) {
+      throw Exception("ailiaLLMOpenModelFile returned an error status $status");
+    }
+  }
+
   /// Free memory allocated natively.
-  void dispose() {}
+  void close() {
+    if (pLLm != nullptr) {
+      if (pLLm.value != nullptr) {
+        dllHandle.ailiaLLMDestroy(pLLm.value);
+        pLLm.value = nullptr;
+      }
+    }
+  }
 
   /// Set the prompt to be process by the model.
   /// The prompt will be formatted according to the selected format.
   /// messages must be an array of object with two string properties
   /// named 'role' and 'content'.
-  int setPromptFromMessages(List<Map<String, dynamic>> messages) {
+  int setPrompt(List<Map<String, dynamic>> messages) {
     // Allocate an array of ailia_llm_chat_message_t and initialize it
     // with the messages data.
     final messagesPtr =
@@ -70,29 +101,19 @@ class AiliaLlmInferenceState {
         final role = messages[i]['role'] as String;
         final p = messagesPtr[i];
 
-        String roleStr = "system";
-        if (role == "system") {
-          roleStr = "system";
-        } else if (role == "user") {
-          roleStr = "user";
-        } else if (role == "assistant") {
-          roleStr = "assistant";
-        } else {
-          throw Exception("unknown 'role' property value '$role'");
-        }
         p.content = content.toNativeUtf8().cast<Char>();
-        p.role = roleStr.toNativeUtf8().cast<Char>();
+        p.role = role.toNativeUtf8().cast<Char>();
       }
 
       return dllHandle.ailiaLLMSetPrompt(
-          ailiaLlm.pLLm.value, messagesPtr, messages.length);
+          pLLm.value, messagesPtr, messages.length);
     } finally {
       // free string
       malloc.free(messagesPtr);
     }
   }
 
-  String pointerCharToString(Pointer<Char> pointer) {
+  String _pointerCharToString(Pointer<Char> pointer) {
     var length = 0;
     while (pointer.elementAt(length).value != 0) {
       length++;
@@ -108,96 +129,39 @@ class AiliaLlmInferenceState {
 
   /// Ask the model to generate the next token.
   /// This function properly handle incomplete multi-byte utf8 character.
-  String? getNextToken() {
-    Pointer<Bool> done = malloc<Bool>();
+  String? generate() {
+    Pointer<Uint32> done = malloc<Uint32>();
     var status = dllHandle.ailiaLLMGenerate(
-      ailiaLlm.pLLm.value,
+      pLLm.value,
       done,
     );
 
-    bool done_flag = done.value;
+    int doneFlag = done.value;
     malloc.free(done);
 
-    if (done_flag == true) {
+    if (doneFlag == 1) {
       return null;
     }
 
-    if (status != 0) {
-      return null;
+    if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
+      if (status == ailia_llm_dart.AILIA_LLM_STATUS_CONTEXT_FULL){
+        return null;
+      }
+      throw Exception("ailiaLLMGenerate returned an error status $status");
     }
 
     // Try first with gBuff which is a buffer associated to this
     // prompt instance.
     final Pointer<UnsignedInt> size = malloc<UnsignedInt>();
-    dllHandle.ailiaLLMGetDeltaTextSize(ailiaLlm.pLLm.value, size);
+    dllHandle.ailiaLLMGetDeltaTextSize(pLLm.value, size);
 
     final Pointer<Char> byteBuffer = malloc<Char>(size.value);
-    dllHandle.ailiaLLMGetDeltaText(ailiaLlm.pLLm.value, byteBuffer, size.value);
-    String deltaText = pointerCharToString(byteBuffer);
+    dllHandle.ailiaLLMGetDeltaText(pLLm.value, byteBuffer, size.value);
+    String deltaText = _pointerCharToString(byteBuffer);
 
     malloc.free(size);
     malloc.free(byteBuffer);
 
     return deltaText;
-  }
-
-  static AiliaLlmInferenceStatus fromNative(int status) {
-    switch (status) {
-      case 0:
-        return AiliaLlmInferenceStatus.success;
-      default:
-        throw Exception("Invalid ailia llm inference status $status");
-    }
-  }
-}
-
-class AiliaLLm {
-  Pointer<Pointer<ailia_llm_dart.AILIALLM>> pLLm = nullptr;
-  dynamic dllHandle;
-
-  AiliaLLm() {
-    dllHandle = ailia_llm_dart.ailiaLlmFFI(_ailiaCommonGetLibrary(_ailiaCommonGetLlmPath()));
-  }
-
-  /// Initialize the context using the given model and parameters.
-  void initialize(String model_path, int n_ctx) {
-    if (pLLm != nullptr) {
-      if (pLLm.value != nullptr) {
-        dllHandle.ailiaLLMDestory(pLLm.value);
-      }
-    }
-
-    pLLm = malloc<Pointer<ailia_llm_dart.AILIALLM>>();
-    pLLm.value = nullptr;
-
-    var status = dllHandle.ailiaLLMCreate(pLLm, n_ctx);
-    if (status != 0) {
-      throw Exception("ailiaLLMCreate returned an error status $status");
-    }
-    if (Platform.isWindows) {
-      status = dllHandle.ailiaLLMOpenModelFileW(
-          pLLm.value, model_path.toNativeUtf16().cast<WChar>());
-    } else {
-      status = dllHandle.ailiaLLMOpenModelFileA(
-          pLLm.value, model_path.toNativeUtf8().cast<Char>());
-    }
-    if (status != 0) {
-      throw Exception("ailiaLLMOpenModelFile returned an error status $status");
-    }
-  }
-
-  /// Free memory allocated natively.
-  void dispose() {
-    if (pLLm != nullptr) {
-      if (pLLm.value != nullptr) {
-        dllHandle.ailiaLLMDestroy(pLLm.value);
-        pLLm.value = nullptr;
-      }
-    }
-  }
-
-  /// Create an inference state associated to this context.
-  AiliaLlmInferenceState createInferenceState() {
-    return AiliaLlmInferenceState(this);
   }
 }

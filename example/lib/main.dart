@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
-import 'package:ailia_llm/ailia_llm.dart';
+import 'package:ailia_llm/ailia_llm_model.dart';
+import 'utils/download_model.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,10 +17,8 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  String _platformVersion = 'Unknown';
-  /*
-  final _ailiaLlmPlugin = AiliaLlm();
-  */
+  final AiliaLLMModel _ailiaLlmModel = AiliaLLMModel();
+  String _predictText = "Downloading...";
 
   @override
   void initState() {
@@ -29,26 +28,56 @@ class _MyAppState extends State<MyApp> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
-    /*
-    String platformVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    // We also handle the message potentially returning null.
-    try {
-      platformVersion =
-          await _ailiaLlmPlugin.getPlatformVersion() ?? 'Unknown platform version';
-    } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
-    }
+    _ailiaLLMTest();
+  }
 
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
+  void _ailiaLLMTest() async{
+    print("Downloading model...");
+    downloadModel("https://storage.googleapis.com/ailia-models/gemma/gemma-2-2b-it-Q4_K_M.gguf", "gemma-2-2b-it-Q4_K_M.gguf", (model_file) {
+      print("Download model success");
 
-    setState(() {
-      _platformVersion = platformVersion;
+      int nCtx = 512;
+      _ailiaLlmModel.open(model_file.path, nCtx);
+
+      List<Map<String, dynamic>> messages = List<Map<String, dynamic>>.empty(growable:true);
+      messages.add({"role": "system", "content": "語尾に「わん」をつけてください。"});
+      messages.add({"role": "user", "content": "こんにちは。"});
+      
+      _ailiaLlmModel.setPrompt(messages);
+      _predictText = "";
+      while(true){
+        String? deltaText = _ailiaLlmModel.generate();
+        if (deltaText == null){
+          break;
+        }
+        _predictText = _predictText + deltaText;
+      }
+
+      messages.add({"role": "assistant", "content": _predictText});
+      messages.add({"role": "user", "content": "前回の回答を英語にしてください。"});
+
+      setState(() {
+        _predictText = _predictText;
+      });
+
+      _ailiaLlmModel.setPrompt(messages);
+      _predictText = _predictText + "\n";
+      while(true){
+        String? deltaText = _ailiaLlmModel.generate();
+        if (deltaText == null){
+          break;
+        }
+        _predictText = _predictText + deltaText;
+      }
+
+      _ailiaLlmModel.close();
+
+      print("Sueccess");
+
+      setState(() {
+        _predictText = _predictText;
+      });
     });
-    */
   }
 
   @override
@@ -56,10 +85,10 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Plugin example app'),
+          title: const Text('ailia LLM example app'),
         ),
         body: Center(
-          child: Text('Running on: $_platformVersion\n'),
+          child: Text('Text : $_predictText\n'),
         ),
       ),
     );
