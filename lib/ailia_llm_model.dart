@@ -6,9 +6,6 @@ import 'package:ffi/ffi.dart';
 
 import 'ailia_llm.dart' as ailia_llm_dart;
 
-import 'dart:ffi';
-import 'dart:io';
-
 String _ailiaCommonGetLlmPath() {
   if (Platform.isAndroid || Platform.isLinux) {
     return 'libailia_llm.so';
@@ -35,6 +32,7 @@ DynamicLibrary _ailiaCommonGetLibrary(String path) {
 class AiliaLLMModel {
   Pointer<Pointer<ailia_llm_dart.AILIALLM>> pLLm = nullptr;
   dynamic dllHandle;
+  bool _contextFull = false;
 
   AiliaLLMModel() {
     dllHandle = ailia_llm_dart.ailiaLlmFFI(_ailiaCommonGetLibrary(_ailiaCommonGetLlmPath()));
@@ -82,7 +80,7 @@ class AiliaLLMModel {
   /// The prompt will be formatted according to the selected format.
   /// messages must be an array of object with two string properties
   /// named 'role' and 'content'.
-  int setPrompt(List<Map<String, dynamic>> messages) {
+  void setPrompt(List<Map<String, dynamic>> messages) {
     // Allocate an array of ailia_llm_chat_message_t and initialize it
     // with the messages data.
     final messagesPtr =
@@ -105,8 +103,17 @@ class AiliaLLMModel {
         p.role = role.toNativeUtf8().cast<Char>();
       }
 
-      return dllHandle.ailiaLLMSetPrompt(
+      _contextFull = false;
+
+      int status = dllHandle.ailiaLLMSetPrompt(
           pLLm.value, messagesPtr, messages.length);
+      if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS){
+        if (status == ailia_llm_dart.AILIA_LLM_STATUS_CONTEXT_FULL){
+          _contextFull = true;
+          return;
+        }
+        throw Exception("ailiaLLMSetPrompt returned an error status $status");
+      }
     } finally {
       // free string
       malloc.free(messagesPtr);
@@ -139,12 +146,15 @@ class AiliaLLMModel {
     int doneFlag = done.value;
     malloc.free(done);
 
+    _contextFull = false;
+
     if (doneFlag == 1) {
       return null;
     }
 
     if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
       if (status == ailia_llm_dart.AILIA_LLM_STATUS_CONTEXT_FULL){
+        _contextFull = true;
         return null;
       }
       throw Exception("ailiaLLMGenerate returned an error status $status");
@@ -163,5 +173,9 @@ class AiliaLLMModel {
     malloc.free(byteBuffer);
 
     return deltaText;
+  }
+
+  bool contextFull(){
+    return _contextFull;
   }
 }

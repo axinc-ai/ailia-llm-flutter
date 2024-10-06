@@ -70,6 +70,10 @@ class _MyAppState extends State<MyApp> {
         _predictText = _predictText + deltaText;
       }
 
+      if (_ailiaLlmModel.contextFull()){
+        print("Context Full");
+      }
+
       _ailiaLlmModel.close();
 
       print("Sueccess");
