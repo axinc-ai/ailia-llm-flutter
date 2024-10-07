@@ -4,7 +4,7 @@
 // ignore_for_file: type=lint
 import 'dart:ffi' as ffi;
 
-/// Bindings to `ailia_llm.h`.
+/// Written for the FFI article
 class ailiaLlmFFI {
   /// Holds the symbol lookup function.
   final ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName)
@@ -1884,64 +1884,67 @@ class ailiaLlmFFI {
       .asFunction<int Function(ffi.Pointer<timespec>, ffi.Pointer<timespec>)>();
 
   int clock_getres(
-    int __clock_id,
+    clockid_t __clock_id,
     ffi.Pointer<timespec> __res,
   ) {
     return _clock_getres(
-      __clock_id,
+      __clock_id.value,
       __res,
     );
   }
 
   late final _clock_getresPtr = _lookup<
       ffi.NativeFunction<
-          ffi.Int Function(ffi.Int32, ffi.Pointer<timespec>)>>('clock_getres');
+          ffi.Int Function(
+              ffi.UnsignedInt, ffi.Pointer<timespec>)>>('clock_getres');
   late final _clock_getres =
       _clock_getresPtr.asFunction<int Function(int, ffi.Pointer<timespec>)>();
 
   int clock_gettime(
-    int __clock_id,
+    clockid_t __clock_id,
     ffi.Pointer<timespec> __tp,
   ) {
     return _clock_gettime(
-      __clock_id,
+      __clock_id.value,
       __tp,
     );
   }
 
   late final _clock_gettimePtr = _lookup<
       ffi.NativeFunction<
-          ffi.Int Function(ffi.Int32, ffi.Pointer<timespec>)>>('clock_gettime');
+          ffi.Int Function(
+              ffi.UnsignedInt, ffi.Pointer<timespec>)>>('clock_gettime');
   late final _clock_gettime =
       _clock_gettimePtr.asFunction<int Function(int, ffi.Pointer<timespec>)>();
 
-  int clock_gettime_nsec_np(
-    int __clock_id,
+  Dart__uint64_t clock_gettime_nsec_np(
+    clockid_t __clock_id,
   ) {
     return _clock_gettime_nsec_np(
-      __clock_id,
+      __clock_id.value,
     );
   }
 
   late final _clock_gettime_nsec_npPtr =
-      _lookup<ffi.NativeFunction<__uint64_t Function(ffi.Int32)>>(
+      _lookup<ffi.NativeFunction<__uint64_t Function(ffi.UnsignedInt)>>(
           'clock_gettime_nsec_np');
   late final _clock_gettime_nsec_np =
       _clock_gettime_nsec_npPtr.asFunction<int Function(int)>();
 
   int clock_settime(
-    int __clock_id,
+    clockid_t __clock_id,
     ffi.Pointer<timespec> __tp,
   ) {
     return _clock_settime(
-      __clock_id,
+      __clock_id.value,
       __tp,
     );
   }
 
   late final _clock_settimePtr = _lookup<
       ffi.NativeFunction<
-          ffi.Int Function(ffi.Int32, ffi.Pointer<timespec>)>>('clock_settime');
+          ffi.Int Function(
+              ffi.UnsignedInt, ffi.Pointer<timespec>)>>('clock_settime');
   late final _clock_settime =
       _clock_settimePtr.asFunction<int Function(int, ffi.Pointer<timespec>)>();
 
@@ -3420,7 +3423,6 @@ class ailiaLlmFFI {
   /// \~japanese
   /// @brief LLMオブジェクトを作成します。
   /// @param llm LLMオブジェクトポインタへのポインタ
-  /// @param n_ctx コンテキスト長（0でモデルのデフォルト）
   /// @return
   /// 成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
   /// @details
@@ -3429,32 +3431,30 @@ class ailiaLlmFFI {
   /// \~english
   /// @brief Creates a LLM instance.
   /// @param llm A pointer to the LLM instance pointer
-  /// @param n_ctx Context length for model (0 is model default）
   /// @return
   /// If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
   /// @details
   /// Creates a LLM instance.
   int ailiaLLMCreate(
     ffi.Pointer<ffi.Pointer<AILIALLM>> llm,
-    int n_ctx,
   ) {
     return _ailiaLLMCreate(
       llm,
-      n_ctx,
     );
   }
 
   late final _ailiaLLMCreatePtr = _lookup<
       ffi.NativeFunction<
-          ffi.Int Function(ffi.Pointer<ffi.Pointer<AILIALLM>>,
-              ffi.UnsignedInt)>>('ailiaLLMCreate');
+          ffi.Int Function(
+              ffi.Pointer<ffi.Pointer<AILIALLM>>)>>('ailiaLLMCreate');
   late final _ailiaLLMCreate = _ailiaLLMCreatePtr
-      .asFunction<int Function(ffi.Pointer<ffi.Pointer<AILIALLM>>, int)>();
+      .asFunction<int Function(ffi.Pointer<ffi.Pointer<AILIALLM>>)>();
 
   /// \~japanese
   /// @brief モデルファイルを読み込みます。
   /// @param llm LLMオブジェクトポインタへのポインタ
   /// @param path GGUFファイルのパス
+  /// @param n_ctx コンテキスト長（0でモデルのデフォルト）
   /// @return
   /// 成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
   /// @details
@@ -3464,6 +3464,7 @@ class ailiaLlmFFI {
   /// @brief Open model file.
   /// @param llm A pointer to the LLM instance pointer
   /// @param path Path for GGUF
+  /// @param n_ctx Context length for model (0 is model default）
   /// @return
   /// If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
   /// @details
@@ -3471,36 +3472,40 @@ class ailiaLlmFFI {
   int ailiaLLMOpenModelFileA(
     ffi.Pointer<AILIALLM> llm,
     ffi.Pointer<ffi.Char> path,
+    int n_ctx,
   ) {
     return _ailiaLLMOpenModelFileA(
       llm,
       path,
+      n_ctx,
     );
   }
 
   late final _ailiaLLMOpenModelFileAPtr = _lookup<
       ffi.NativeFunction<
-          ffi.Int Function(ffi.Pointer<AILIALLM>,
-              ffi.Pointer<ffi.Char>)>>('ailiaLLMOpenModelFileA');
-  late final _ailiaLLMOpenModelFileA = _ailiaLLMOpenModelFileAPtr
-      .asFunction<int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>)>();
+          ffi.Int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>,
+              ffi.UnsignedInt)>>('ailiaLLMOpenModelFileA');
+  late final _ailiaLLMOpenModelFileA = _ailiaLLMOpenModelFileAPtr.asFunction<
+      int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>, int)>();
 
   int ailiaLLMOpenModelFileW(
     ffi.Pointer<AILIALLM> llm,
     ffi.Pointer<ffi.WChar> path,
+    int n_ctx,
   ) {
     return _ailiaLLMOpenModelFileW(
       llm,
       path,
+      n_ctx,
     );
   }
 
   late final _ailiaLLMOpenModelFileWPtr = _lookup<
       ffi.NativeFunction<
-          ffi.Int Function(ffi.Pointer<AILIALLM>,
-              ffi.Pointer<ffi.WChar>)>>('ailiaLLMOpenModelFileW');
+          ffi.Int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.WChar>,
+              ffi.UnsignedInt)>>('ailiaLLMOpenModelFileW');
   late final _ailiaLLMOpenModelFileW = _ailiaLLMOpenModelFileWPtr.asFunction<
-      int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.WChar>)>();
+      int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.WChar>, int)>();
 
   /// \~japanese
   /// @brief コンテキストの長さを取得します。
@@ -3930,15 +3935,30 @@ typedef __darwin_clock_t = ffi.UnsignedLong;
 typedef Dart__darwin_clock_t = int;
 typedef time_t = __darwin_time_t;
 
-abstract class clockid_t {
-  static const int _CLOCK_REALTIME = 0;
-  static const int _CLOCK_MONOTONIC = 6;
-  static const int _CLOCK_MONOTONIC_RAW = 4;
-  static const int _CLOCK_MONOTONIC_RAW_APPROX = 5;
-  static const int _CLOCK_UPTIME_RAW = 8;
-  static const int _CLOCK_UPTIME_RAW_APPROX = 9;
-  static const int _CLOCK_PROCESS_CPUTIME_ID = 12;
-  static const int _CLOCK_THREAD_CPUTIME_ID = 16;
+enum clockid_t {
+  _CLOCK_REALTIME(0),
+  _CLOCK_MONOTONIC(6),
+  _CLOCK_MONOTONIC_RAW(4),
+  _CLOCK_MONOTONIC_RAW_APPROX(5),
+  _CLOCK_UPTIME_RAW(8),
+  _CLOCK_UPTIME_RAW_APPROX(9),
+  _CLOCK_PROCESS_CPUTIME_ID(12),
+  _CLOCK_THREAD_CPUTIME_ID(16);
+
+  final int value;
+  const clockid_t(this.value);
+
+  static clockid_t fromValue(int value) => switch (value) {
+        0 => _CLOCK_REALTIME,
+        6 => _CLOCK_MONOTONIC,
+        4 => _CLOCK_MONOTONIC_RAW,
+        5 => _CLOCK_MONOTONIC_RAW_APPROX,
+        8 => _CLOCK_UPTIME_RAW,
+        9 => _CLOCK_UPTIME_RAW_APPROX,
+        12 => _CLOCK_PROCESS_CPUTIME_ID,
+        16 => _CLOCK_THREAD_CPUTIME_ID,
+        _ => throw ArgumentError("Unknown value for clockid_t: $value"),
+      };
 }
 
 typedef __uint64_t = ffi.UnsignedLongLong;

@@ -49,17 +49,17 @@ class AiliaLLMModel {
     pLLm = malloc<Pointer<ailia_llm_dart.AILIALLM>>();
     pLLm.value = nullptr;
 
-    var status = dllHandle.ailiaLLMCreate(pLLm, nCtx);
+    var status = dllHandle.ailiaLLMCreate(pLLm);
     if (status != 0) {
       throw Exception("ailiaLLMCreate returned an error status $status");
     }
 
     if (Platform.isWindows) {
       status = dllHandle.ailiaLLMOpenModelFileW(
-          pLLm.value, modelPath.toNativeUtf16().cast<WChar>());
+          pLLm.value, modelPath.toNativeUtf16().cast<WChar>(), nCtx);
     } else {
       status = dllHandle.ailiaLLMOpenModelFileA(
-          pLLm.value, modelPath.toNativeUtf8().cast<Char>());
+          pLLm.value, modelPath.toNativeUtf8().cast<Char>(), nCtx);
     }
     if (status != 0) {
       throw Exception("ailiaLLMOpenModelFile returned an error status $status");

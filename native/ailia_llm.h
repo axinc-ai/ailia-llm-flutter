@@ -15,6 +15,8 @@
 #ifndef INCLUDED_AILIA_LLM
 #define INCLUDED_AILIA_LLM
 
+#include <wchar.h>
+
 /* 呼び出し規約 */
 
 #ifdef AILIA_LLM_SHARED
@@ -30,8 +32,6 @@
 #else
 #    define AILIA_LLM_API
 #endif
-
-#include <wchar.h>
 
 /****************************************************************
  * ライブラリ状態定義
@@ -236,7 +236,6 @@ AILIA_LLM_API int ailiaLLMGetBackendName(const char** env, unsigned int env_idx)
  * \~japanese
  * @brief LLMオブジェクトを作成します。
  * @param llm LLMオブジェクトポインタへのポインタ
- * @param n_ctx コンテキスト長（0でモデルのデフォルト）
  * @return
  *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
  * @details
@@ -245,19 +244,19 @@ AILIA_LLM_API int ailiaLLMGetBackendName(const char** env, unsigned int env_idx)
  * \~english
  * @brief Creates a LLM instance.
  * @param llm A pointer to the LLM instance pointer
- * @param n_ctx Context length for model (0 is model default）
  * @return
  *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
  * @details
  *   Creates a LLM instance.
  */
-AILIA_LLM_API int ailiaLLMCreate(struct AILIALLM** llm, unsigned int n_ctx);
+AILIA_LLM_API int ailiaLLMCreate(struct AILIALLM** llm);
 
 /**
  * \~japanese
  * @brief モデルファイルを読み込みます。
  * @param llm LLMオブジェクトポインタへのポインタ
  * @param path GGUFファイルのパス
+ * @param n_ctx コンテキスト長（0でモデルのデフォルト）
  * @return
  *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
  * @details
@@ -267,13 +266,14 @@ AILIA_LLM_API int ailiaLLMCreate(struct AILIALLM** llm, unsigned int n_ctx);
  * @brief Open model file.
  * @param llm A pointer to the LLM instance pointer
  * @param path Path for GGUF
+ * @param n_ctx Context length for model (0 is model default）
  * @return
  *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
  * @details
  *   Open a model file for GGUF.
  */
-AILIA_LLM_API int ailiaLLMOpenModelFileA(struct AILIALLM* llm, const char *path);
-AILIA_LLM_API int ailiaLLMOpenModelFileW(struct AILIALLM* llm, const wchar_t *path);
+AILIA_LLM_API int ailiaLLMOpenModelFileA(struct AILIALLM* llm, const char *path, unsigned int n_ctx);
+AILIA_LLM_API int ailiaLLMOpenModelFileW(struct AILIALLM* llm, const wchar_t *path, unsigned int n_ctx);
 
 /**
  * \~japanese
