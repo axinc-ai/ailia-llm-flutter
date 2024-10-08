@@ -1,0 +1,8 @@
+﻿name: 'ailiaLlmFFI'
+description: 'Written for the FFI article'
+output: 'lib/ailia_llm.dart'
+headers:
+  entry-points:
+    - 'native/ailia_llm.h'
+llvm-path:
+  - '/usr/local/opt/llvm@15'
