@@ -33,7 +33,7 @@ class AiliaLLMModel {
   Pointer<Pointer<ailia_llm_dart.AILIALLM>> pLLm = nullptr;
   dynamic dllHandle;
   bool _contextFull = false;
-  List<int> _buf = [];
+  Uint8List _buf = Uint8List(0);
   String _beforeText = "";
 
   AiliaLLMModel() {
@@ -106,7 +106,7 @@ class AiliaLLMModel {
       }
 
       _contextFull = false;
-      _buf = [];
+      _buf = Uint8List(0);
       _beforeText = "";
 
       int status = dllHandle.ailiaLLMSetPrompt(
@@ -158,9 +158,15 @@ class AiliaLLMModel {
     final Pointer<Char> byteBuffer = malloc<Char>(size.value);
     dllHandle.ailiaLLMGetDeltaText(pLLm.value, byteBuffer, size.value);
 
-    for (int i = 0; i < size.value - 1; i++){
-      _buf.add(byteBuffer.elementAt(i).value);
+    var buffer = Uint8List(size.value - 1);
+    for (var i = 0; i < size.value  - 1; i++) {
+      buffer[i] = byteBuffer.elementAt(i).value;
     }
+
+    Uint8List combinedUint8List = Uint8List(_buf.length + buffer.length);
+    combinedUint8List.setRange(0, _buf.length, _buf);
+    combinedUint8List.setRange(_buf.length, _buf.length + buffer.length, buffer);
+    _buf = combinedUint8List;
 
     malloc.free(size);
     malloc.free(byteBuffer);
