@@ -33,6 +33,8 @@ class AiliaLLMModel {
   Pointer<Pointer<ailia_llm_dart.AILIALLM>> pLLm = nullptr;
   dynamic dllHandle;
   bool _contextFull = false;
+  List<int> _buf = [];
+  String _beforeText = "";
 
   AiliaLLMModel() {
     dllHandle = ailia_llm_dart.ailiaLlmFFI(_ailiaCommonGetLibrary(_ailiaCommonGetLlmPath()));
@@ -104,6 +106,8 @@ class AiliaLLMModel {
       }
 
       _contextFull = false;
+      _buf = [];
+      _beforeText = "";
 
       int status = dllHandle.ailiaLLMSetPrompt(
           pLLm.value, messagesPtr, messages.length);
@@ -118,20 +122,6 @@ class AiliaLLMModel {
       // free string
       malloc.free(messagesPtr);
     }
-  }
-
-  String _pointerCharToString(Pointer<Char> pointer) {
-    var length = 0;
-    while (pointer.elementAt(length).value != 0) {
-      length++;
-    }
-
-    var buffer = Uint8List(length);
-    for (var i = 0; i < length; i++) {
-      buffer[i] = pointer.elementAt(i).value;
-    }
-
-    return utf8.decode(buffer);
   }
 
   /// Ask the model to generate the next token.
@@ -167,10 +157,24 @@ class AiliaLLMModel {
 
     final Pointer<Char> byteBuffer = malloc<Char>(size.value);
     dllHandle.ailiaLLMGetDeltaText(pLLm.value, byteBuffer, size.value);
-    String deltaText = _pointerCharToString(byteBuffer);
+
+    for (int i = 0; i < size.value - 1; i++){
+      _buf.add(byteBuffer.elementAt(i).value);
+    }
 
     malloc.free(size);
     malloc.free(byteBuffer);
+
+    String deltaText = "";
+    try {
+      String text = utf8.decode(_buf);
+      if (_beforeText.length != text.length){
+        deltaText = text.substring(_beforeText.length);
+      }
+      _beforeText = text;
+    } on FormatException catch(e) {
+      // unicode decode error
+    }
 
     return deltaText;
   }
