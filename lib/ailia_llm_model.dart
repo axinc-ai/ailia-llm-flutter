@@ -79,6 +79,8 @@ class AiliaLLMModel {
         dllHandle.ailiaLLMDestroy(pLLm.value);
         pLLm.value = nullptr;
       }
+      malloc.free(pLLm);
+      pLLm = nullptr;
     }
   }
 
