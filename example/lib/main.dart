@@ -74,6 +74,8 @@ class _MyAppState extends State<MyApp> {
         print("Context Full");
       }
 
+      print(_ailiaLlmModel.getTokenCount("こんにちは。トークンの数を数えます。"));
+
       _ailiaLlmModel.close();
 
       print("Sueccess");

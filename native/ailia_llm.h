@@ -15,23 +15,14 @@
 #ifndef INCLUDED_AILIA_LLM
 #define INCLUDED_AILIA_LLM
 
-#include <wchar.h>
-
-/* 呼び出し規約 */
-
-#ifdef AILIA_LLM_SHARED
-#    if defined(_WIN32) && !defined(__MINGW32__)
-#        ifdef AILIA_LLM_BUILD
-#            define AILIA_LLM_API __declspec(dllexport)
-#        else
-#            define AILIA_LLM_API __declspec(dllimport)
-#        endif
-#    else
-#        define AILIA_LLM_API __attribute__ ((visibility ("default")))
-#    endif
+#if defined(_WIN64) || defined(_M_X64) || defined(__amd64__) || defined(__x86_64__) || defined(__APPLE__) || \
+	defined(__ANDROID__) || defined(ANDROID) || defined(__linux__) || defined(NN_NINTENDO_SDK)
+#define AILIA_LLM_API
 #else
-#    define AILIA_LLM_API
+#define AILIA_LLM_API __stdcall
 #endif
+
+#include <wchar.h>
 
 /****************************************************************
  * ライブラリ状態定義
@@ -345,15 +336,15 @@ AILIA_LLM_API int ailiaLLMGenerate(struct AILIALLM* llm, unsigned int *done);
 /**
  * \~japanese
  * @brief テキストの長さを取得します。(NULL文字含む)
- * @param llm   LLMオブジェクトポインタ
- * @param len  テキストの長さ
+ * @param llm       LLMオブジェクトポインタ
+ * @param buf_size  テキストの長さ
  * @return
  *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
  *
  * \~english
  * @brief Gets the size of text. (Include null)
- * @param llm   A LLM instance pointer
- * @param len  The length of text
+ * @param llm       A LLM instance pointer
+ * @param buf_size  The length of text
  * @return
  *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
  */
@@ -362,9 +353,9 @@ AILIA_LLM_API int ailiaLLMGetDeltaTextSize(struct AILIALLM* llm, unsigned int *b
 /**
  * \~japanese
  * @brief テキストを取得します。
- * @param llm   LLMオブジェクトポインタ
- * @param text  テキスト(UTF8)
- * @param len バッファサイズ
+ * @param llm       LLMオブジェクトポインタ
+ * @param text      テキスト(UTF8)
+ * @param buf_size  バッファサイズ
  * @return
  *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
  * @details
@@ -372,15 +363,34 @@ AILIA_LLM_API int ailiaLLMGetDeltaTextSize(struct AILIALLM* llm, unsigned int *b
  *
  * \~english
  * @brief Gets the decoded text.
- * @param llm   A LLM instance pointer
- * @param text  Text(UTF8)
- * @param len  Buffer size
+ * @param llm       A LLM instance pointer
+ * @param text      Text(UTF8)
+ * @param buf_size  Buffer size
  * @return
  *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
  * @details
  *   If  ailiaLLMGenerate()  is not run at all, the function returns  \ref AILIA_LLM_STATUS_INVALID_STATE .
  */
 AILIA_LLM_API int ailiaLLMGetDeltaText(struct AILIALLM* llm, char * text, unsigned int buf_size);
+
+/**
+ * \~japanese
+ * @brief トークンの数を取得します。
+ * @param llm   LLMオブジェクトポインタ
+ * @param cnt   トークンの数
+ * @param text  テキスト(UTF8)
+ * @return
+ *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
+ *
+ * \~english
+ * @brief Gets the count of token.
+ * @param llm   A LLM instance pointer
+ * @param cnt   The count of token
+ * @param text  Text(UTF8)
+ * @return
+ *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
+ */
+AILIA_LLM_API int ailiaLLMGetTokenCount(struct AILIALLM* llm, unsigned int *cnt, const char* text);
 
 /**
  * \~japanese
