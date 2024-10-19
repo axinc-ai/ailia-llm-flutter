@@ -57,11 +57,15 @@ class AiliaLLMModel {
     }
 
     if (Platform.isWindows) {
+      Pointer<WChar> path =  modelPath.toNativeUtf16().cast<WChar>();
       status = dllHandle.ailiaLLMOpenModelFileW(
-          pLLm.value, modelPath.toNativeUtf16().cast<WChar>(), nCtx);
+          pLLm.value, path, nCtx);
+      malloc.free(path);
     } else {
+      Pointer<Char> path =  modelPath.toNativeUtf8().cast<Char>();
       status = dllHandle.ailiaLLMOpenModelFileA(
-          pLLm.value, modelPath.toNativeUtf8().cast<Char>(), nCtx);
+          pLLm.value, path, nCtx);
+      malloc.free(path);
     }
     if (status != 0) {
       throw Exception("ailiaLLMOpenModelFile returned an error status $status");
@@ -75,6 +79,8 @@ class AiliaLLMModel {
         dllHandle.ailiaLLMDestroy(pLLm.value);
         pLLm.value = nullptr;
       }
+      malloc.free(pLLm);
+      pLLm = nullptr;
     }
   }
 
@@ -120,6 +126,15 @@ class AiliaLLMModel {
       }
     } finally {
       // free string
+      for (var i = 0; i < messages.length; i++) {
+        final p = messagesPtr[i];
+        if (p.content != nullptr){
+          malloc.free(p.content);
+        }
+        if (p.role != nullptr){
+          malloc.free(p.role);
+        }
+      }
       malloc.free(messagesPtr);
     }
   }
@@ -127,6 +142,10 @@ class AiliaLLMModel {
   /// Ask the model to generate the next token.
   /// This function properly handle incomplete multi-byte utf8 character.
   String? generate() {
+    if (pLLm == nullptr){
+      throw Exception("ailia LLM not initialized.");
+    }
+
     Pointer<Uint32> done = malloc<Uint32>();
     var status = dllHandle.ailiaLLMGenerate(
       pLLm.value,
@@ -187,5 +206,19 @@ class AiliaLLMModel {
 
   bool contextFull(){
     return _contextFull;
+  }
+
+  // Get token count
+  int getTokenCount(String text){
+    if (pLLm == nullptr){
+      throw Exception("ailia LLM not initialized.");
+    }
+
+    final Pointer<UnsignedInt> count = malloc<UnsignedInt>();
+    Pointer<Char> pText = text.toNativeUtf8().cast<Char>();
+    dllHandle.ailiaLLMGetTokenCount(pLLm.value, count, pText);
+    int retCount = count.value;
+    malloc.free(count);
+    return retCount;
   }
 }

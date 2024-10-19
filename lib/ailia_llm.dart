@@ -3620,15 +3620,15 @@ class ailiaLlmFFI {
 
   /// \~japanese
   /// @brief テキストの長さを取得します。(NULL文字含む)
-  /// @param llm   LLMオブジェクトポインタ
-  /// @param len  テキストの長さ
+  /// @param llm       LLMオブジェクトポインタ
+  /// @param buf_size  テキストの長さ
   /// @return
   /// 成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
   ///
   /// \~english
   /// @brief Gets the size of text. (Include null)
-  /// @param llm   A LLM instance pointer
-  /// @param len  The length of text
+  /// @param llm       A LLM instance pointer
+  /// @param buf_size  The length of text
   /// @return
   /// If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
   int ailiaLLMGetDeltaTextSize(
@@ -3651,9 +3651,9 @@ class ailiaLlmFFI {
 
   /// \~japanese
   /// @brief テキストを取得します。
-  /// @param llm   LLMオブジェクトポインタ
-  /// @param text  テキスト(UTF8)
-  /// @param len バッファサイズ
+  /// @param llm       LLMオブジェクトポインタ
+  /// @param text      テキスト(UTF8)
+  /// @param buf_size  バッファサイズ
   /// @return
   /// 成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
   /// @details
@@ -3661,9 +3661,9 @@ class ailiaLlmFFI {
   ///
   /// \~english
   /// @brief Gets the decoded text.
-  /// @param llm   A LLM instance pointer
-  /// @param text  Text(UTF8)
-  /// @param len  Buffer size
+  /// @param llm       A LLM instance pointer
+  /// @param text      Text(UTF8)
+  /// @param buf_size  Buffer size
   /// @return
   /// If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
   /// @details
@@ -3686,6 +3686,41 @@ class ailiaLlmFFI {
               ffi.UnsignedInt)>>('ailiaLLMGetDeltaText');
   late final _ailiaLLMGetDeltaText = _ailiaLLMGetDeltaTextPtr.asFunction<
       int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>, int)>();
+
+  /// \~japanese
+  /// @brief トークンの数を取得します。
+  /// @param llm   LLMオブジェクトポインタ
+  /// @param cnt   トークンの数
+  /// @param text  テキスト(UTF8)
+  /// @return
+  /// 成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
+  ///
+  /// \~english
+  /// @brief Gets the count of token.
+  /// @param llm   A LLM instance pointer
+  /// @param cnt   The count of token
+  /// @param text  Text(UTF8)
+  /// @return
+  /// If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
+  int ailiaLLMGetTokenCount(
+    ffi.Pointer<AILIALLM> llm,
+    ffi.Pointer<ffi.UnsignedInt> cnt,
+    ffi.Pointer<ffi.Char> text,
+  ) {
+    return _ailiaLLMGetTokenCount(
+      llm,
+      cnt,
+      text,
+    );
+  }
+
+  late final _ailiaLLMGetTokenCountPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.UnsignedInt>,
+              ffi.Pointer<ffi.Char>)>>('ailiaLLMGetTokenCount');
+  late final _ailiaLLMGetTokenCount = _ailiaLLMGetTokenCountPtr.asFunction<
+      int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.UnsignedInt>,
+          ffi.Pointer<ffi.Char>)>();
 
   /// \~japanese
   /// @brief LLMオブジェクトを破棄します。
