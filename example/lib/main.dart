@@ -116,7 +116,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    List<String> backendList = _ailiaLlmModel.getBackendList();
+    List<String> backendList = AiliaLLMModel.getBackendList();
     if (_backend == "") {
       _backend = backendList[0];
     }

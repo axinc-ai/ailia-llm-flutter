@@ -42,18 +42,24 @@ DynamicLibrary _ailiaCommonGetLibrary(String path) {
 }
 
 class AiliaLLMModel {
+  static DynamicLibrary? _library = null;
+  static List<List<String>> _backend = List<List<String>>.empty();
+
   Pointer<Pointer<ailia_llm_dart.AILIALLM>> pLLm = nullptr;
-  DynamicLibrary? _library = null;
   dynamic dllHandle;
   String _currentBackend = "";
   bool _contextFull = false;
   Uint8List _buf = Uint8List(0);
   String _beforeText = "";
-  List<List<String>> _backend = List<List<String>>.empty(growable: true);
   List<Map<String, dynamic>> _prompt = List<Map<String, dynamic>>.empty();
   bool _existText = false;
 
-  AiliaLLMModel() {
+  AiliaLLMModel() {}
+
+  static List<String> getBackendList() {
+    if (_backend.length > 0) {
+      return _backend[1];
+    }
     _backend = List<List<String>>.empty(growable: true);
     _backend.add(List<String>.empty(growable: true));
     _backend.add(List<String>.empty(growable: true));
@@ -61,13 +67,13 @@ class AiliaLLMModel {
     for (int i = 0; i < libraries.length; i++) {
       try {
         _library = _ailiaCommonGetLibrary(libraries[0][i]);
-        dllHandle = ailia_llm_dart.ailiaLlmFFI(_library!);
         _backend[0].add(libraries[0][i]);
         _backend[1].add(libraries[1][i]);
         _library!.close();
       } on Exception {
       } on ArgumentError {}
     }
+    return _backend[1];
   }
 
   /// Initialize the context using the given model and parameters.
@@ -291,10 +297,5 @@ class AiliaLLMModel {
     int retCount = count.value;
     malloc.free(count);
     return retCount;
-  }
-
-  // Get backend
-  List<String> getBackendList() {
-    return _backend[1];
   }
 }
