@@ -42,17 +42,15 @@ DynamicLibrary _ailiaCommonGetLibrary(String path) {
 }
 
 class AiliaLLMModel {
-  static DynamicLibrary? _library = null;
   static List<List<String>> _backend = List<List<String>>.empty();
 
   Pointer<Pointer<ailia_llm_dart.AILIALLM>> pLLm = nullptr;
+  DynamicLibrary? _library;
   dynamic dllHandle;
   String _currentBackend = "";
   bool _contextFull = false;
   Uint8List _buf = Uint8List(0);
   String _beforeText = "";
-  List<Map<String, dynamic>> _prompt = List<Map<String, dynamic>>.empty();
-  bool _existText = false;
 
   AiliaLLMModel() {}
 
@@ -66,10 +64,10 @@ class AiliaLLMModel {
     List<List<String>> libraries = _ailiaCommonGetLlmPath();
     for (int i = 0; i < libraries.length; i++) {
       try {
-        _library = _ailiaCommonGetLibrary(libraries[0][i]);
+        DynamicLibrary library = _ailiaCommonGetLibrary(libraries[0][i]);
         _backend[0].add(libraries[0][i]);
         _backend[1].add(libraries[1][i]);
-        _library!.close();
+        library.close();
       } on Exception {
       } on ArgumentError {}
     }
@@ -194,9 +192,6 @@ class AiliaLLMModel {
       }
       malloc.free(messagesPtr);
     }
-
-    _prompt = messages;
-    _existText = false;
   }
 
   /// Ask the model to generate the next token.
@@ -205,25 +200,7 @@ class AiliaLLMModel {
     if (pLLm == nullptr) {
       throw Exception("ailia LLM not initialized.");
     }
-    String? result = _generate();
-    if (result == null) {
-      if (_existText == false) {
-        for (int i = 0; i < 3; i++) {
-          print("Retry LLM ${i}.");
-          setPrompt(_prompt);
-          result = _generate();
-          if (result != null) {
-            break;
-          }
-        }
-      }
-    } else {
-      _existText = true;
-    }
-    return result;
-  }
 
-  String? _generate() {
     Pointer<Uint32> done = malloc<Uint32>();
     var status = dllHandle.ailiaLLMGenerate(
       pLLm.value,

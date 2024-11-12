@@ -46,8 +46,6 @@ class _MyAppState extends State<MyApp> {
     downloadModel(
         "https://storage.googleapis.com/ailia-models/gemma/gemma-2-2b-it-Q4_K_M.gguf",
         "gemma-2-2b-it-Q4_K_M.gguf", (model_file) {
-      print("Download model success");
-
       setState(() {
         _predictText = "Processing...";
       });
@@ -96,7 +94,10 @@ class _MyAppState extends State<MyApp> {
         print("Context Full");
       }
 
-      print(_ailiaLlmModel.getTokenCount("トークンの数を数えます。"));
+      int contextSize = _ailiaLlmModel.getTokenCount("トークンの数を数えます。");
+      if (contextSize != 7) {
+        _predictText = "contextSize error $contextSize";
+      }
 
       int endTime = DateTime.now().millisecondsSinceEpoch;
       _profileText = "processing time : ${(endTime - startTime) / 1000} sec";
