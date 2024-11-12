@@ -53,6 +53,9 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 # external build triggered from this build file.
 set(ailia_llm_bundled_libraries
   "${CMAKE_CURRENT_SOURCE_DIR}/x64/ailia_llm.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/x64/ailia_llm_vulkan.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/x64/llama.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/x64/ggml.dll"
   PARENT_SCOPE
 )
 
