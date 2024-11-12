@@ -95,8 +95,8 @@ class AiliaLLMModel {
       }
       List<String> backendList = getBackendList();
       for (int i = 0; i < backendList.length; i++) {
-        if (backendList[1][i] == backend) {
-          _library = _ailiaCommonGetLibrary(backendList[0][i]);
+        if (backendList[i] == backend) {
+          _library = _ailiaCommonGetLibrary(_backend[0][i]);
           dllHandle = ailia_llm_dart.ailiaLlmFFI(_library!);
           _currentBackend = backend;
           break;
