@@ -51,7 +51,7 @@ class _MyAppState extends State<MyApp> {
       });
 
       int nCtx = 512;
-      _ailiaLlmModel.open(model_file.path, nCtx);
+      _ailiaLlmModel.open(model_file.path, nCtx, backend: _backend);
 
       int startTime = DateTime.now().millisecondsSinceEpoch;
 
