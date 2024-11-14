@@ -21,7 +21,7 @@ List<List<String>> _ailiaCommonGetLlmPath() {
   }
   if (Platform.isWindows) {
     return [
-      ['ailia_llm.dll', 'ailia_llm_vulkan.dll'],
+      ['ailia_llm_fallback.dll', 'ailia_llm.dll'],
       ['CPU', 'Vulkan']
     ];
   }
