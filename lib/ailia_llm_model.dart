@@ -6,17 +6,29 @@ import 'package:ffi/ffi.dart';
 
 import 'ailia_llm.dart' as ailia_llm_dart;
 
-String _ailiaCommonGetLlmPath() {
+List<List<String>> _ailiaCommonGetLlmPath() {
   if (Platform.isAndroid || Platform.isLinux) {
-    return 'libailia_llm.so';
+    return [
+      ['libailia_llm.so'],
+      ['CPU']
+    ];
   }
   if (Platform.isMacOS) {
-    return 'libailia_llm.dylib';
+    return [
+      ['libailia_llm.dylib'],
+      ['Metal']
+    ];
   }
   if (Platform.isWindows) {
-    return 'ailia_llm.dll';
+    return [
+      ['ailia_llm_fallback.dll', 'ailia_llm.dll'],
+      ['CPU', 'Vulkan']
+    ];
   }
-  return 'internal';
+  return [
+    ['internal'],
+    ['CPU']
+  ];
 }
 
 DynamicLibrary _ailiaCommonGetLibrary(String path) {
@@ -30,21 +42,66 @@ DynamicLibrary _ailiaCommonGetLibrary(String path) {
 }
 
 class AiliaLLMModel {
+  static List<List<String>> _backend = List<List<String>>.empty();
+
   Pointer<Pointer<ailia_llm_dart.AILIALLM>> pLLm = nullptr;
+  DynamicLibrary? _library;
   dynamic dllHandle;
+  String _currentBackend = "";
   bool _contextFull = false;
   Uint8List _buf = Uint8List(0);
   String _beforeText = "";
 
-  AiliaLLMModel() {
-    dllHandle = ailia_llm_dart.ailiaLlmFFI(_ailiaCommonGetLibrary(_ailiaCommonGetLlmPath()));
+  AiliaLLMModel() {}
+
+  static List<String> getBackendList() {
+    if (_backend.length > 0) {
+      return _backend[1];
+    }
+    _backend = List<List<String>>.empty(growable: true);
+    _backend.add(List<String>.empty(growable: true));
+    _backend.add(List<String>.empty(growable: true));
+    List<List<String>> libraries = _ailiaCommonGetLlmPath();
+    for (int i = 0; i < libraries.length; i++) {
+      try {
+        DynamicLibrary library = _ailiaCommonGetLibrary(libraries[0][i]);
+        _backend[0].add(libraries[0][i]);
+        _backend[1].add(libraries[1][i]);
+        library.close();
+      } on Exception {
+      } on ArgumentError {}
+    }
+    return _backend[1];
   }
 
   /// Initialize the context using the given model and parameters.
-  void open(String modelPath, int nCtx) {
+  void open(String modelPath, int nCtx, {String backend = ""}) {
     if (pLLm != nullptr) {
       if (pLLm.value != nullptr) {
         dllHandle.ailiaLLMDestory(pLLm.value);
+      }
+    }
+
+    if (backend == "") {
+      backend = _backend[1][0];
+    }
+
+    if (_currentBackend != backend) {
+      if (_library != null) {
+        _library!.close();
+        _library = null;
+      }
+      List<String> backendList = getBackendList();
+      for (int i = 0; i < backendList.length; i++) {
+        if (backendList[i] == backend) {
+          _library = _ailiaCommonGetLibrary(_backend[0][i]);
+          dllHandle = ailia_llm_dart.ailiaLlmFFI(_library!);
+          _currentBackend = backend;
+          break;
+        }
+      }
+      if (_library == null) {
+        throw Exception("ailiaLLM backend not found");
       }
     }
 
@@ -57,14 +114,12 @@ class AiliaLLMModel {
     }
 
     if (Platform.isWindows) {
-      Pointer<WChar> path =  modelPath.toNativeUtf16().cast<WChar>();
-      status = dllHandle.ailiaLLMOpenModelFileW(
-          pLLm.value, path, nCtx);
+      Pointer<WChar> path = modelPath.toNativeUtf16().cast<WChar>();
+      status = dllHandle.ailiaLLMOpenModelFileW(pLLm.value, path, nCtx);
       malloc.free(path);
     } else {
-      Pointer<Char> path =  modelPath.toNativeUtf8().cast<Char>();
-      status = dllHandle.ailiaLLMOpenModelFileA(
-          pLLm.value, path, nCtx);
+      Pointer<Char> path = modelPath.toNativeUtf8().cast<Char>();
+      status = dllHandle.ailiaLLMOpenModelFileA(pLLm.value, path, nCtx);
       malloc.free(path);
     }
     if (status != 0) {
@@ -84,11 +139,26 @@ class AiliaLLMModel {
     }
   }
 
+  void setSamplingParams(int top_k, double top_p, double temp, int dist) {
+    if (pLLm == nullptr) {
+      throw Exception("ailia LLM not initialized.");
+    }
+
+    var status = dllHandle.ailiaLLMSetSamplingParams(pLLm.value, top_k, top_p, temp, dist);
+    if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
+      throw Exception("ailiaLLMGenerate returned an error status $status");
+    }
+  }
+
   /// Set the prompt to be process by the model.
   /// The prompt will be formatted according to the selected format.
   /// messages must be an array of object with two string properties
   /// named 'role' and 'content'.
   void setPrompt(List<Map<String, dynamic>> messages) {
+    if (pLLm == nullptr) {
+      throw Exception("ailia LLM not initialized.");
+    }
+
     // Allocate an array of ailia_llm_chat_message_t and initialize it
     // with the messages data.
     final messagesPtr =
@@ -115,10 +185,10 @@ class AiliaLLMModel {
       _buf = Uint8List(0);
       _beforeText = "";
 
-      int status = dllHandle.ailiaLLMSetPrompt(
-          pLLm.value, messagesPtr, messages.length);
-      if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS){
-        if (status == ailia_llm_dart.AILIA_LLM_STATUS_CONTEXT_FULL){
+      int status =
+          dllHandle.ailiaLLMSetPrompt(pLLm.value, messagesPtr, messages.length);
+      if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
+        if (status == ailia_llm_dart.AILIA_LLM_STATUS_CONTEXT_FULL) {
           _contextFull = true;
           return;
         }
@@ -128,10 +198,10 @@ class AiliaLLMModel {
       // free string
       for (var i = 0; i < messages.length; i++) {
         final p = messagesPtr[i];
-        if (p.content != nullptr){
+        if (p.content != nullptr) {
           malloc.free(p.content);
         }
-        if (p.role != nullptr){
+        if (p.role != nullptr) {
           malloc.free(p.role);
         }
       }
@@ -142,7 +212,7 @@ class AiliaLLMModel {
   /// Ask the model to generate the next token.
   /// This function properly handle incomplete multi-byte utf8 character.
   String? generate() {
-    if (pLLm == nullptr){
+    if (pLLm == nullptr) {
       throw Exception("ailia LLM not initialized.");
     }
 
@@ -151,7 +221,6 @@ class AiliaLLMModel {
       pLLm.value,
       done,
     );
-
     int doneFlag = done.value;
     malloc.free(done);
 
@@ -162,7 +231,7 @@ class AiliaLLMModel {
     }
 
     if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
-      if (status == ailia_llm_dart.AILIA_LLM_STATUS_CONTEXT_FULL){
+      if (status == ailia_llm_dart.AILIA_LLM_STATUS_CONTEXT_FULL) {
         _contextFull = true;
         return null;
       }
@@ -178,13 +247,14 @@ class AiliaLLMModel {
     dllHandle.ailiaLLMGetDeltaText(pLLm.value, byteBuffer, size.value);
 
     var buffer = Uint8List(size.value - 1);
-    for (var i = 0; i < size.value  - 1; i++) {
+    for (var i = 0; i < size.value - 1; i++) {
       buffer[i] = byteBuffer.elementAt(i).value;
     }
 
     Uint8List combinedUint8List = Uint8List(_buf.length + buffer.length);
     combinedUint8List.setRange(0, _buf.length, _buf);
-    combinedUint8List.setRange(_buf.length, _buf.length + buffer.length, buffer);
+    combinedUint8List.setRange(
+        _buf.length, _buf.length + buffer.length, buffer);
     _buf = combinedUint8List;
 
     malloc.free(size);
@@ -193,24 +263,24 @@ class AiliaLLMModel {
     String deltaText = "";
     try {
       String text = utf8.decode(_buf);
-      if (_beforeText.length != text.length){
+      if (_beforeText.length != text.length) {
         deltaText = text.substring(_beforeText.length);
       }
       _beforeText = text;
-    } on FormatException catch(e) {
+    } on FormatException catch (e) {
       // unicode decode error
     }
 
     return deltaText;
   }
 
-  bool contextFull(){
+  bool contextFull() {
     return _contextFull;
   }
 
   // Get token count
-  int getTokenCount(String text){
-    if (pLLm == nullptr){
+  int getTokenCount(String text) {
+    if (pLLm == nullptr) {
       throw Exception("ailia LLM not initialized.");
     }
 

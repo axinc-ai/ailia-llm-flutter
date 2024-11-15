@@ -15,14 +15,14 @@
 #ifndef INCLUDED_AILIA_LLM
 #define INCLUDED_AILIA_LLM
 
+#include <stddef.h>
+
 #if defined(_WIN64) || defined(_M_X64) || defined(__amd64__) || defined(__x86_64__) || defined(__APPLE__) || \
 	defined(__ANDROID__) || defined(ANDROID) || defined(__linux__) || defined(NN_NINTENDO_SDK)
 #define AILIA_LLM_API
 #else
 #define AILIA_LLM_API __stdcall
 #endif
-
-#include <wchar.h>
 
 /****************************************************************
  * ライブラリ状態定義
@@ -282,6 +282,33 @@ AILIA_LLM_API int ailiaLLMOpenModelFileW(struct AILIALLM* llm, const wchar_t *pa
  *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
  */
 AILIA_LLM_API int ailiaLLMGetContextSize(struct AILIALLM* llm, unsigned int *context_size);
+
+/**
+ * \~japanese
+ * @brief サンプリングのパラメータを設定します。
+ * @param llm LLMオブジェクトポインタへのポインタ
+ * @param top_k サンプリングする確率値の上位個数、デフォルト40
+ * @param top_p サンプリングする確率値の範囲、デフォルト0.9（0.9〜1.0）
+ * @param temp 温度パラメータ、デフォルト0.4
+ * @param dist シード、デフォルト1234
+ * @return
+ *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
+ * @details
+ *   LLMのサンプリングの設定を行います。ailiaLLMSetPromptの前に実行する必要があります。
+ *
+ * \~english
+ * @brief Set the sampling parameter.
+ * @param llm A pointer to the LLM instance pointer
+ * @param top_k Sampling probability value's top number, default 40
+ * @param top_p Sampling probability value range, default 0.9 (0.9 to 1.0)
+ * @param temp Temperature parameter, default 0.4
+ * @param dist Seed, default 1234 
+ * @return
+ *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
+ * @details
+ *  Set LLM sampling parameters. Must be run before ailiaLLMSetPrompt. 
+ */
+AILIA_LLM_API int ailiaLLMSetSamplingParams(struct AILIALLM* llm, unsigned int top_k, float top_p, float temp, unsigned int dist);
 
 /**
  * \~japanese
