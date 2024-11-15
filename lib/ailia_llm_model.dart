@@ -51,7 +51,6 @@ class AiliaLLMModel {
   bool _contextFull = false;
   Uint8List _buf = Uint8List(0);
   String _beforeText = "";
-  List<Map<String, dynamic>> _messages = List<Map<String, dynamic>>.empty();
 
   AiliaLLMModel() {}
 
@@ -140,31 +139,42 @@ class AiliaLLMModel {
     }
   }
 
+  void setSamplingParams(int top_k, double top_p, double temp, int dist) {
+    if (pLLm == nullptr) {
+      throw Exception("ailia LLM not initialized.");
+    }
+
+    var status = dllHandle.ailiaLLMSetSamplingParams(pLLm.value, top_k, top_p, temp, dist);
+    if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
+      throw Exception("ailiaLLMGenerate returned an error status $status");
+    }
+  }
+
   /// Set the prompt to be process by the model.
   /// The prompt will be formatted according to the selected format.
   /// messages must be an array of object with two string properties
   /// named 'role' and 'content'.
   void setPrompt(List<Map<String, dynamic>> messages) {
-    _messages = messages;
-  }
+    if (pLLm == nullptr) {
+      throw Exception("ailia LLM not initialized.");
+    }
 
-  void _setPrompt(){
     // Allocate an array of ailia_llm_chat_message_t and initialize it
     // with the messages data.
     final messagesPtr =
-        calloc<ailia_llm_dart.AILIALLMChatMessage>(_messages.length);
+        calloc<ailia_llm_dart.AILIALLMChatMessage>(messages.length);
 
     try {
-      for (var i = 0; i < _messages.length; i++) {
-        if (!_messages[i].containsKey("content")) {
+      for (var i = 0; i < messages.length; i++) {
+        if (!messages[i].containsKey("content")) {
           throw Exception("missing 'content' property");
         }
-        if (!_messages[i].containsKey("role")) {
+        if (!messages[i].containsKey("role")) {
           throw Exception("missing 'role' property");
         }
 
-        final content = _messages[i]['content'] as String;
-        final role = _messages[i]['role'] as String;
+        final content = messages[i]['content'] as String;
+        final role = messages[i]['role'] as String;
         final p = messagesPtr[i];
 
         p.content = content.toNativeUtf8().cast<Char>();
@@ -176,7 +186,7 @@ class AiliaLLMModel {
       _beforeText = "";
 
       int status =
-          dllHandle.ailiaLLMSetPrompt(pLLm.value, messagesPtr, _messages.length);
+          dllHandle.ailiaLLMSetPrompt(pLLm.value, messagesPtr, messages.length);
       if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
         if (status == ailia_llm_dart.AILIA_LLM_STATUS_CONTEXT_FULL) {
           _contextFull = true;
@@ -186,7 +196,7 @@ class AiliaLLMModel {
       }
     } finally {
       // free string
-      for (var i = 0; i < _messages.length; i++) {
+      for (var i = 0; i < messages.length; i++) {
         final p = messagesPtr[i];
         if (p.content != nullptr) {
           malloc.free(p.content);
@@ -201,20 +211,13 @@ class AiliaLLMModel {
 
   /// Ask the model to generate the next token.
   /// This function properly handle incomplete multi-byte utf8 character.
-  String? generate({top_k = 40, top_p = 0.9, temp = 0.4, dist = 1234}) {
+  String? generate() {
     if (pLLm == nullptr) {
       throw Exception("ailia LLM not initialized.");
     }
 
-    var status = dllHandle.ailiaLLMSetSamplingParams(pLLm.value, top_k, top_p, temp, dist);
-    if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
-      throw Exception("ailiaLLMGenerate returned an error status $status");
-    }
-
-    _setPrompt();
-
     Pointer<Uint32> done = malloc<Uint32>();
-    status = dllHandle.ailiaLLMGenerate(
+    var status = dllHandle.ailiaLLMGenerate(
       pLLm.value,
       done,
     );
