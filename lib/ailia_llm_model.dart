@@ -96,8 +96,8 @@ class AiliaLLMModel {
     _backend.add(List<String>.empty(growable: true));
     _backend.add(List<String>.empty(growable: true));
     List<List<String>> libraries = _ailiaCommonGetLlmPath();
-    for (int i = 0; i < libraries.length; i++) {
-      // Check Vulkan Supported
+    for (int i = 0; i < libraries[0].length; i++) {
+      // Check Vulkan Supported Version
       if (libraries[1][i] == BACKEND_VULKAN){
         if (checkVulkanVersion() == false){
           continue;
