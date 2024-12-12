@@ -46,8 +46,10 @@ DynamicLibrary _ailiaCommonGetLibrary(String path) {
   return library;
 }
 
-typedef VkEnumerateInstanceVersionNative = Int32 Function(Pointer<Uint32> apiVersion);
-typedef VkEnumerateInstanceVersionDart = int Function(Pointer<Uint32> apiVersion);
+typedef VkEnumerateInstanceVersionNative = Int32 Function(
+    Pointer<Uint32> apiVersion);
+typedef VkEnumerateInstanceVersionDart = int Function(
+    Pointer<Uint32> apiVersion);
 
 class AiliaLLMModel {
   static List<List<String>> _backend = List<List<String>>.empty();
@@ -61,8 +63,8 @@ class AiliaLLMModel {
   String _beforeText = "";
 
   AiliaLLMModel() {}
-  
-  static bool checkVulkanVersion(){
+
+  static bool checkVulkanVersion() {
     try {
       final DynamicLibrary vulkanLib = Platform.isWindows
           ? DynamicLibrary.open('vulkan-1.dll')
@@ -78,11 +80,11 @@ class AiliaLLMModel {
         final int major = (version >> 22) & 0x3FF;
         final int minor = (version >> 12) & 0x3FF;
         //final int patch = version & 0xFFF;
-        print("Vulkan version ${major} ${minor}");
-        available = (major > 1 || (major == 1 &&  minor >= 1));
+        //print("Vulkan version ${major}.${minor}");
+        available = (major > 1 || (major == 1 && minor >= 1));
       }
       calloc.free(apiVersion);
-    return available;
+      return available;
     } on Exception {
     } on ArgumentError {}
     return false;
@@ -98,8 +100,8 @@ class AiliaLLMModel {
     List<List<String>> libraries = _ailiaCommonGetLlmPath();
     for (int i = 0; i < libraries[0].length; i++) {
       // Check Vulkan Supported Version
-      if (libraries[1][i] == BACKEND_VULKAN){
-        if (checkVulkanVersion() == false){
+      if (libraries[1][i] == BACKEND_VULKAN) {
+        if (checkVulkanVersion() == false) {
           continue;
         }
       }
@@ -185,7 +187,8 @@ class AiliaLLMModel {
       throw Exception("ailia LLM not initialized.");
     }
 
-    var status = dllHandle.ailiaLLMSetSamplingParams(pLLm.value, top_k, top_p, temp, dist);
+    var status = dllHandle.ailiaLLMSetSamplingParams(
+        pLLm.value, top_k, top_p, temp, dist);
     if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
       throw Exception("ailiaLLMGenerate returned an error status $status");
     }
