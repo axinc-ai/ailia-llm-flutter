@@ -77,11 +77,11 @@ class AiliaLLMModel {
       bool available = false;
       if (result == 0) {
         final int version = apiVersion.value;
-        final int major = (version >> 22) & 0x3FF;
+        final int variant = (version >> 29);
+        final int major = (version >> 22) & 0x7F;
         final int minor = (version >> 12) & 0x3FF;
-        //final int patch = version & 0xFFF;
+        available = variant  == 0 && (major > 1 || (major == 1 && minor >= 1));
         //print("Vulkan version ${major}.${minor}");
-        available = (major > 1 || (major == 1 && minor >= 1));
       }
       calloc.free(apiVersion);
       return available;
