@@ -3,31 +3,36 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
+import 'dart:ffi';
 
 import 'ailia_llm.dart' as ailia_llm_dart;
+
+const String BACKEND_CPU = "CPU";
+const String BACKEND_VULKAN = "Vulkan";
+const String BACKEND_METAL = "Metal";
 
 List<List<String>> _ailiaCommonGetLlmPath() {
   if (Platform.isAndroid || Platform.isLinux) {
     return [
       ['libailia_llm.so'],
-      ['CPU']
+      [BACKEND_CPU]
     ];
   }
   if (Platform.isMacOS) {
     return [
       ['libailia_llm.dylib'],
-      ['Metal']
+      [BACKEND_METAL]
     ];
   }
   if (Platform.isWindows) {
     return [
       ['ailia_llm_fallback.dll', 'ailia_llm.dll'],
-      ['CPU', 'Vulkan']
+      [BACKEND_CPU, BACKEND_VULKAN]
     ];
   }
   return [
     ['internal'],
-    ['CPU']
+    [BACKEND_CPU]
   ];
 }
 
@@ -41,6 +46,9 @@ DynamicLibrary _ailiaCommonGetLibrary(String path) {
   return library;
 }
 
+typedef VkEnumerateInstanceVersionNative = Int32 Function(Pointer<Uint32> apiVersion);
+typedef VkEnumerateInstanceVersionDart = int Function(Pointer<Uint32> apiVersion);
+
 class AiliaLLMModel {
   static List<List<String>> _backend = List<List<String>>.empty();
 
@@ -53,6 +61,32 @@ class AiliaLLMModel {
   String _beforeText = "";
 
   AiliaLLMModel() {}
+  
+  static bool checkVulkanVersion(){
+    try {
+      final DynamicLibrary vulkanLib = Platform.isWindows
+          ? DynamicLibrary.open('vulkan-1.dll')
+          : DynamicLibrary.open('libvulkan.so');
+      final VkEnumerateInstanceVersionDart vkEnumerateInstanceVersion =
+          vulkanLib.lookupFunction<VkEnumerateInstanceVersionNative,
+              VkEnumerateInstanceVersionDart>('vkEnumerateInstanceVersion');
+      final Pointer<Uint32> apiVersion = calloc<Uint32>();
+      final int result = vkEnumerateInstanceVersion(apiVersion);
+      bool available = false;
+      if (result == 0) {
+        final int version = apiVersion.value;
+        final int major = (version >> 22) & 0x3FF;
+        final int minor = (version >> 12) & 0x3FF;
+        //final int patch = version & 0xFFF;
+        print("Vulkan version ${major} ${minor}");
+        available = (major > 1 || (major == 1 &&  minor >= 1));
+      }
+      calloc.free(apiVersion);
+    return available;
+    } on Exception {
+    } on ArgumentError {}
+    return false;
+  }
 
   static List<String> getBackendList() {
     if (_backend.length > 0) {
@@ -63,6 +97,13 @@ class AiliaLLMModel {
     _backend.add(List<String>.empty(growable: true));
     List<List<String>> libraries = _ailiaCommonGetLlmPath();
     for (int i = 0; i < libraries.length; i++) {
+      // Check Vulkan Supported
+      if (libraries[1][i] == BACKEND_VULKAN){
+        if (checkVulkanVersion() == false){
+          continue;
+        }
+      }
+      // Continue
       try {
         DynamicLibrary library = _ailiaCommonGetLibrary(libraries[0][i]);
         _backend[0].add(libraries[0][i]);
