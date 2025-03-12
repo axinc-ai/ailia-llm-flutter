@@ -15,7 +15,7 @@
 #ifndef INCLUDED_AILIA_LLM
 #define INCLUDED_AILIA_LLM
 
-#include <stddef.h>
+#include <wchar.h>
 
 #if defined(_WIN64) || defined(_M_X64) || defined(__amd64__) || defined(__x86_64__) || defined(__APPLE__) || \
 	defined(__ANDROID__) || defined(ANDROID) || defined(__linux__) || defined(NN_NINTENDO_SDK)
@@ -418,6 +418,48 @@ AILIA_LLM_API int ailiaLLMGetDeltaText(struct AILIALLM* llm, char * text, unsign
  *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
  */
 AILIA_LLM_API int ailiaLLMGetTokenCount(struct AILIALLM* llm, unsigned int *cnt, const char* text);
+
+/**
+ * \~japanese
+ * @brief プロンプトトークンの数を取得します。
+ * @param llm   LLMオブジェクトポインタ
+ * @param cnt   プロンプトトークンの数
+ * @return
+ *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
+ * @details
+ *   ailiaLLMSetPromptを呼び出した後に呼び出し可能です。
+ *
+ * \~english
+ * @brief Gets the count of prompt token.
+ * @param llm   A LLM instance pointer
+ * @param cnt   The count of prompt token
+ * @return
+ *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
+ * @details
+ *   It can be called after calling ailiaLLMSetPrompt.
+ */
+AILIA_LLM_API int ailiaLLMGetPromptTokenCount(struct AILIALLM* llm, unsigned int *cnt);
+
+/**
+ * \~japanese
+ * @brief 生成したトークンの数を取得します。
+ * @param llm   LLMオブジェクトポインタ
+ * @param cnt   生成したトークンの数
+ * @return
+ *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
+ * @details
+ *   ailiaLLMGenerateを呼び出した後に呼び出し可能です。
+ *
+ * \~english
+ * @brief Gets the count of prompt token.
+ * @param llm   A LLM instance pointer
+ * @param cnt   The count of generated token
+ * @return
+ *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
+ * @details
+ *   It can be called after calling ailiaLLMGenerate.
+ */
+AILIA_LLM_API int ailiaLLMGetGeneratedTokenCount(struct AILIALLM* llm, unsigned int *cnt);
 
 /**
  * \~japanese

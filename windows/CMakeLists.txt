@@ -56,6 +56,10 @@ set(ailia_llm_bundled_libraries
   "${CMAKE_CURRENT_SOURCE_DIR}/x64/ailia_llm_fallback.dll"
   "${CMAKE_CURRENT_SOURCE_DIR}/x64/llama.dll"
   "${CMAKE_CURRENT_SOURCE_DIR}/x64/ggml.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/x64/ggml-base.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/x64/ggml-cpu.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/x64/ggml-rpc.dll"
+  "${CMAKE_CURRENT_SOURCE_DIR}/x64/ggml-vulkan.dll"
   PARENT_SCOPE
 )
 
