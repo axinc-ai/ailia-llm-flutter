@@ -1,6 +1,6 @@
 name: ailia_llm
 description: "ailia LLM for Flutter"
-version: 1.3.2
+version: 1.3.3
 homepage:
 
 environment:
