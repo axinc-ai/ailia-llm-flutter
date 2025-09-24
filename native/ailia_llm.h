@@ -176,6 +176,68 @@ typedef struct _AILIALLMChatMessage {
     const char *content;
 } AILIALLMChatMessage;
 
+/****************************************************************
+ * マルチモーダル画像/音声データ
+ **/
+
+/**
+ * \~japanese
+ * @brief マルチモーダル用のメディアデータ構造体。オーディオキーワード、raw data入力は現在は未サポートで、将来的な実装のために予約されています。
+ * \~english
+ * @brief Media data structure for multimodal processing. Audio keywords and raw data input are currently unsupported and reserved for future implementation.
+ */
+typedef struct _AILIALLMMediaData {
+    /**
+     * @brief Media type (image, audio)
+     */
+    const char *media_type;
+    /**
+     * @brief Path to the media file
+     */
+    const char *file_path;
+    /**
+     * @brief Optional: Raw media data (alternative to file_path)
+     */
+    const unsigned char *data;
+    /**
+     * @brief Size of the raw data (used with data parameter)
+     */
+    unsigned int data_size;
+    /**
+     * @brief Width for images (pixels), sample count for audio
+     */
+    unsigned int width;
+    /**
+     * @brief Height for images (pixels), unused for audio (set to 0)
+     */
+    unsigned int height;
+} AILIALLMMediaData;
+
+/**
+ * \~japanese
+ * @brief マルチモーダル対応チャットメッセージ
+ * \~english
+ * @brief Multimodal chat message with media attachments
+ */
+typedef struct _AILIALLMMultimodalChatMessage {
+    /**
+     * @brief Represent the role. (system, user, assistant)
+     */
+    const char *role;
+    /**
+     * @brief Represent the content of the message. Use <__media__> placeholder for media.
+     */
+    const char *content;
+    /**
+     * @brief Array of media data (images, audio) referenced by <__media__> markers
+     */
+    const AILIALLMMediaData *media_data;
+    /**
+     * @brief Number of media items in media_data array
+     */
+    unsigned int media_count;
+} AILIALLMMultimodalChatMessage;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -321,6 +383,7 @@ AILIA_LLM_API int ailiaLLMSetSamplingParams(struct AILIALLM* llm, unsigned int t
  * @details
  *   LLMに問い合わせるプロンプトを設定します。
  *   ChatHistoryもmessageに含めてください。
+ *   messageの内容は内部でコピーされるため、呼び出し後に開放することができます。
  *
  * \~english
  * @brief Set the prompt.
@@ -332,6 +395,7 @@ AILIA_LLM_API int ailiaLLMSetSamplingParams(struct AILIALLM* llm, unsigned int t
  * @details
  *   Set the prompt to query the LLM.
  *   Please include ChatHistory in the message as well.
+ *   The contents of the message are copied internally, so you can free them after the call.
  */
 AILIA_LLM_API int ailiaLLMSetPrompt(struct AILIALLM* llm, const AILIALLMChatMessage * message, unsigned int message_cnt);
 
@@ -460,6 +524,87 @@ AILIA_LLM_API int ailiaLLMGetPromptTokenCount(struct AILIALLM* llm, unsigned int
  *   It can be called after calling ailiaLLMGenerate.
  */
 AILIA_LLM_API int ailiaLLMGetGeneratedTokenCount(struct AILIALLM* llm, unsigned int *cnt);
+
+/****************************************************************
+ * マルチモーダル LLM API
+ **/
+
+/**
+ * \~japanese
+ * @brief マルチモーダルプロジェクタファイルを読み込みます。
+ * @param llm LLMオブジェクトポインタ
+ * @param mmproj_path MMPROJファイルのパス（GGUF形式）
+ * @return
+ *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
+ * @details
+ *   マルチモーダル機能を使用するには、先にailiaLLMOpenModelFileでテキストモデルを読み込み、
+ *   その後でこの関数でマルチモーダルプロジェクタを読み込む必要があります。
+ *
+ * \~english
+ * @brief Load multimodal projector file.
+ * @param llm A LLM instance pointer
+ * @param mmproj_path Path to the MMPROJ file (GGUF format)
+ * @return
+ *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
+ * @details
+ *   To use multimodal features, you must first load the text model with ailiaLLMOpenModelFile,
+ *   then load the multimodal projector with this function.
+ */
+AILIA_LLM_API int ailiaLLMOpenMultimodalProjectorFileA(struct AILIALLM* llm, const char *mmproj_path);
+AILIA_LLM_API int ailiaLLMOpenMultimodalProjectorFileW(struct AILIALLM* llm, const wchar_t *mmproj_path);
+
+/**
+ * \~japanese
+ * @brief マルチモーダル機能がサポートされているかを確認します。
+ * @param llm LLMオブジェクトポインタ
+ * @param vision_support 画像処理をサポートしているか
+ * @param audio_support 音声処理をサポートしているか
+ * @return
+ *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
+ * @details
+ *   ailiaLLMOpenMultimodalProjectorFileの後に呼び出し可能です。
+ *
+ * \~english
+ * @brief Check if multimodal features are supported.
+ * @param llm A LLM instance pointer
+ * @param vision_support Whether image processing is supported
+ * @param audio_support Whether audio processing is supported
+ * @return
+ *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
+ * @details
+ *   Can be called after ailiaLLMOpenMultimodalProjectorFile.
+ */
+AILIA_LLM_API int ailiaLLMGetMultimodalCapabilities(struct AILIALLM* llm, unsigned int *vision_support, unsigned int *audio_support);
+
+/**
+ * \~japanese
+ * @brief マルチモーダルプロンプトを設定します。
+ * @param llm LLMオブジェクトポインタ
+ * @param message マルチモーダルメッセージの配列
+ * @param message_cnt メッセージの数
+ * @return
+ *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
+ * @details
+ *   マルチモーダル対応のプロンプトを設定します。メッセージのcontentに<__media__>プレースホルダーを含め、
+ *   対応するメディアデータをmedia_dataに設定してください。
+ *   例: "この画像について説明してください: <__media__>"
+ *   messageの内容は内部でコピーされるため、呼び出し後に開放することができます。raw_data入力は現在未サポートです。
+ *
+ * \~english
+ * @brief Set multimodal prompt.
+ * @param llm A LLM instance pointer
+ * @param message Array of multimodal messages
+ * @param message_cnt Number of messages
+ * @return
+ *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
+ * @details
+ *   Set multimodal prompt. Include <__media__> placeholders in message content,
+ *   and set corresponding media data in media_data.
+ *   Example: "Describe this image: <__media__>"
+ *   The content of message is copied internally, so it can be freed after the call.
+ *   Raw data input is currently unsupported.
+ */
+AILIA_LLM_API int ailiaLLMSetMultimodalPrompt(struct AILIALLM* llm, const AILIALLMMultimodalChatMessage * message, unsigned int message_cnt);
 
 /**
  * \~japanese
