@@ -335,4 +335,142 @@ class AiliaLLMModel {
     malloc.free(count);
     return retCount;
   }
+
+  // Open multimodal projector file
+  void openMultimodalProjectorFile(String mmprojPath) {
+    if (pLLm == nullptr) {
+      throw Exception("ailia LLM not initialized.");
+    }
+
+    int status;
+    if (Platform.isWindows) {
+      Pointer<WChar> path = mmprojPath.toNativeUtf16().cast<WChar>();
+      status = dllHandle.ailiaLLMOpenMultimodalProjectorFileW(pLLm.value, path);
+      malloc.free(path);
+    } else {
+      Pointer<Char> path = mmprojPath.toNativeUtf8().cast<Char>();
+      status = dllHandle.ailiaLLMOpenMultimodalProjectorFileA(pLLm.value, path);
+      malloc.free(path);
+    }
+    if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
+      throw Exception("ailiaLLMOpenMultimodalProjectorFile returned an error status $status");
+    }
+  }
+
+  // Get multimodal capabilities
+  Map<String, bool> getMultimodalCapabilities() {
+    if (pLLm == nullptr) {
+      throw Exception("ailia LLM not initialized.");
+    }
+
+    final Pointer<UnsignedInt> visionSupport = malloc<UnsignedInt>();
+    final Pointer<UnsignedInt> audioSupport = malloc<UnsignedInt>();
+
+    int status = dllHandle.ailiaLLMGetMultimodalCapabilities(pLLm.value, visionSupport, audioSupport);
+
+    bool vision = visionSupport.value != 0;
+    bool audio = audioSupport.value != 0;
+
+    malloc.free(visionSupport);
+    malloc.free(audioSupport);
+
+    if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
+      throw Exception("ailiaLLMGetMultimodalCapabilities returned an error status $status");
+    }
+
+    return {"vision": vision, "audio": audio};
+  }
+
+  // Set multimodal prompt
+  void setMultimodalPrompt(List<Map<String, dynamic>> messages) {
+    if (pLLm == nullptr) {
+      throw Exception("ailia LLM not initialized.");
+    }
+
+    // Allocate an array of AILIALLMMultimodalChatMessage and initialize it
+    final messagesPtr = calloc<ailia_llm_dart.AILIALLMMultimodalChatMessage>(messages.length);
+
+    try {
+      for (var i = 0; i < messages.length; i++) {
+        if (!messages[i].containsKey("content")) {
+          throw Exception("missing 'content' property");
+        }
+        if (!messages[i].containsKey("role")) {
+          throw Exception("missing 'role' property");
+        }
+
+        final content = messages[i]['content'] as String;
+        final role = messages[i]['role'] as String;
+        final p = messagesPtr[i];
+
+        p.content = content.toNativeUtf8().cast<Char>();
+        p.role = role.toNativeUtf8().cast<Char>();
+
+        // Handle media data if present
+        if (messages[i].containsKey('media_data') && messages[i]['media_data'] != null) {
+          final mediaList = messages[i]['media_data'] as List<Map<String, dynamic>>;
+          if (mediaList.isNotEmpty) {
+            final mediaPtr = calloc<ailia_llm_dart.AILIALLMMediaData>(mediaList.length);
+            p.media_data = mediaPtr;
+            p.media_count = mediaList.length;
+
+            for (var j = 0; j < mediaList.length; j++) {
+              final media = mediaList[j];
+              final mediaData = mediaPtr[j];
+
+              mediaData.media_type = (media['media_type'] as String).toNativeUtf8().cast<Char>();
+              mediaData.file_path = (media['file_path'] as String).toNativeUtf8().cast<Char>();
+              mediaData.data = nullptr;
+              mediaData.data_size = 0;
+              mediaData.width = media['width'] ?? 0;
+              mediaData.height = media['height'] ?? 0;
+            }
+          } else {
+            p.media_data = nullptr;
+            p.media_count = 0;
+          }
+        } else {
+          p.media_data = nullptr;
+          p.media_count = 0;
+        }
+      }
+
+      _contextFull = false;
+      _buf = Uint8List(0);
+      _beforeText = "";
+
+      int status = dllHandle.ailiaLLMSetMultimodalPrompt(pLLm.value, messagesPtr, messages.length);
+      if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
+        if (status == ailia_llm_dart.AILIA_LLM_STATUS_CONTEXT_FULL) {
+          _contextFull = true;
+          return;
+        }
+        throw Exception("ailiaLLMSetMultimodalPrompt returned an error status $status");
+      }
+    } finally {
+      // free strings and media data
+      for (var i = 0; i < messages.length; i++) {
+        final p = messagesPtr[i];
+        if (p.content != nullptr) {
+          malloc.free(p.content);
+        }
+        if (p.role != nullptr) {
+          malloc.free(p.role);
+        }
+        if (p.media_data != nullptr) {
+          for (var j = 0; j < p.media_count; j++) {
+            final mediaData = p.media_data[j];
+            if (mediaData.media_type != nullptr) {
+              malloc.free(mediaData.media_type);
+            }
+            if (mediaData.file_path != nullptr) {
+              malloc.free(mediaData.file_path);
+            }
+          }
+          malloc.free(p.media_data);
+        }
+      }
+      malloc.free(messagesPtr);
+    }
+  }
 }
