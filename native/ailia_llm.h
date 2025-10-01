@@ -182,21 +182,21 @@ typedef struct _AILIALLMChatMessage {
 
 /**
  * \~japanese
- * @brief マルチモーダル用のメディアデータ構造体。オーディオキーワード、raw data入力は現在は未サポートで、将来的な実装のために予約されています。
+ * @brief マルチモーダル用のメディアデータ構造体。オーディオキーワード、raw data入力は現在は未サポートで、将来的な実装のために予約されています。画像の対応フォーマットはJPG、PNG、TGA、BMP、PSD、GIF、HDR、PICです。
  * \~english
- * @brief Media data structure for multimodal processing. Audio keywords and raw data input are currently unsupported and reserved for future implementation.
+ * @brief Media data structure for multimodal processing. Audio keywords and raw data input are currently unsupported and reserved for future implementation. Supported image formats are JPG, PNG, TGA, BMP, PSD, GIF, HDR, and PIC.
  */
 typedef struct _AILIALLMMediaData {
     /**
-     * @brief Media type (image, audio)
+     * @brief Media type (image, audio). "audio" keywards are reserved for future use, currently unsupported.
      */
     const char *media_type;
     /**
-     * @brief Path to the media file
+     * @brief Path to the media file (utf8).
      */
     const char *file_path;
     /**
-     * @brief Optional: Raw media data (alternative to file_path)
+     * @brief Optional: Raw media data (alternative to file_path). Currently unsupported, reserved for future use.
      */
     const unsigned char *data;
     /**
