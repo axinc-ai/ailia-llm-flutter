@@ -1,29 +1,13 @@
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-/*
-import 'package:ailia_llm/ailia_llm_method_channel.dart';
+
+// This file previously contained tests for MethodChannel interface.
+// Those tests have been replaced by comprehensive tests in ailia_llm_test.dart
+// which directly test the AiliaLLMModel class.
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
-
-  MethodChannelAiliaLlm platform = MethodChannelAiliaLlm();
-  const MethodChannel channel = MethodChannel('ailia_llm');
-
-  setUp(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
-      channel,
-      (MethodCall methodCall) async {
-        return '42';
-      },
-    );
-  });
-
-  tearDown(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
-  });
-
-  test('getPlatformVersion', () async {
-    expect(await platform.getPlatformVersion(), '42');
+  test('placeholder test', () {
+    // This is a placeholder to avoid compilation errors.
+    // All actual tests are in ailia_llm_test.dart
+    expect(true, isTrue);
   });
 }
-*/
