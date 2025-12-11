@@ -102,15 +102,8 @@ void main() {
     final int nCtx = 2048;
 
     setUpAll(() {
-      // Use model from environment variable or default path
-      final homeDir = Platform.environment['HOME'] ?? '';
-      modelPath = Platform.environment['AILIA_LLM_MODEL_PATH'] ??
-          '$homeDir/claude_workspace/models/gemma-2-2b-it-Q4_K_M.gguf';
-
-      // Verify model file exists - test will fail if not found
-      expect(File(modelPath).existsSync(), isTrue,
-        reason: 'Model file not found at $modelPath. '
-                'Please ensure model is available at ~/claude_workspace/models/ or set the AILIA_LLM_MODEL_PATH environment variable.');
+      // Use model from environment variable
+      modelPath = Platform.environment['AILIA_LLM_MODEL_PATH'] ?? '';
     });
 
     setUp(() {
@@ -122,11 +115,21 @@ void main() {
     });
 
     test('open and close model successfully', () {
+      expect(modelPath, isNotEmpty,
+        reason: 'Model path not set. Set AILIA_LLM_MODEL_PATH environment variable.');
+      expect(File(modelPath).existsSync(), isTrue,
+        reason: 'Model file not found at $modelPath');
+
       expect(() => model.open(modelPath, nCtx), returnsNormally);
       expect(() => model.close(), returnsNormally);
     });
 
     test('setSamplingParams sets parameters successfully', () {
+      expect(modelPath, isNotEmpty,
+        reason: 'Model path not set. Set AILIA_LLM_MODEL_PATH environment variable.');
+      expect(File(modelPath).existsSync(), isTrue,
+        reason: 'Model file not found at $modelPath');
+
       model.open(modelPath, nCtx);
       expect(
         () => model.setSamplingParams(1, 0.98, 0.05, 3939),
@@ -135,6 +138,11 @@ void main() {
     });
 
     test('setPrompt with valid messages succeeds', () {
+      expect(modelPath, isNotEmpty,
+        reason: 'Model path not set. Set AILIA_LLM_MODEL_PATH environment variable.');
+      expect(File(modelPath).existsSync(), isTrue,
+        reason: 'Model file not found at $modelPath');
+
       model.open(modelPath, nCtx);
       final messages = [
         {'role': 'system', 'content': '質問と同じ言語で回答してください。'},
@@ -146,6 +154,11 @@ void main() {
     });
 
     test('setPrompt throws exception when missing content', () {
+      expect(modelPath, isNotEmpty,
+        reason: 'Model path not set. Set AILIA_LLM_MODEL_PATH environment variable.');
+      expect(File(modelPath).existsSync(), isTrue,
+        reason: 'Model file not found at $modelPath');
+
       model.open(modelPath, nCtx);
       final messages = [
         {'role': 'user'}
@@ -155,6 +168,11 @@ void main() {
     });
 
     test('setPrompt throws exception when missing role', () {
+      expect(modelPath, isNotEmpty,
+        reason: 'Model path not set. Set AILIA_LLM_MODEL_PATH environment variable.');
+      expect(File(modelPath).existsSync(), isTrue,
+        reason: 'Model file not found at $modelPath');
+
       model.open(modelPath, nCtx);
       final messages = [
         {'content': 'Hello'}
@@ -164,6 +182,11 @@ void main() {
     });
 
     test('getTokenCount returns valid count', () {
+      expect(modelPath, isNotEmpty,
+        reason: 'Model path not set. Set AILIA_LLM_MODEL_PATH environment variable.');
+      expect(File(modelPath).existsSync(), isTrue,
+        reason: 'Model file not found at $modelPath');
+
       model.open(modelPath, nCtx);
       final count = model.getTokenCount('How many legs does a cat have?');
 
@@ -172,6 +195,11 @@ void main() {
     });
 
     test('generate produces text output', () {
+      expect(modelPath, isNotEmpty,
+        reason: 'Model path not set. Set AILIA_LLM_MODEL_PATH environment variable.');
+      expect(File(modelPath).existsSync(), isTrue,
+        reason: 'Model file not found at $modelPath');
+
       model.open(modelPath, nCtx);
       model.setSamplingParams(1, 0.98, 0.05, 3939);
 
@@ -204,6 +232,11 @@ void main() {
     });
 
     test('Japanese response test', () {
+      expect(modelPath, isNotEmpty,
+        reason: 'Model path not set. Set AILIA_LLM_MODEL_PATH environment variable.');
+      expect(File(modelPath).existsSync(), isTrue,
+        reason: 'Model file not found at $modelPath');
+
       model.open(modelPath, nCtx);
       model.setSamplingParams(1, 0.98, 0.05, 3939);
 
@@ -234,6 +267,11 @@ void main() {
     });
 
     test('multi-turn conversation test', () {
+      expect(modelPath, isNotEmpty,
+        reason: 'Model path not set. Set AILIA_LLM_MODEL_PATH environment variable.');
+      expect(File(modelPath).existsSync(), isTrue,
+        reason: 'Model file not found at $modelPath');
+
       model.open(modelPath, nCtx);
       model.setSamplingParams(1, 0.98, 0.05, 3939);
 
@@ -277,6 +315,11 @@ void main() {
     });
 
     test('context full detection', () {
+      expect(modelPath, isNotEmpty,
+        reason: 'Model path not set. Set AILIA_LLM_MODEL_PATH environment variable.');
+      expect(File(modelPath).existsSync(), isTrue,
+        reason: 'Model file not found at $modelPath');
+
       // Open with very small context
       model.open(modelPath, 128);
 
