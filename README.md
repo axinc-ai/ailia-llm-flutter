@@ -18,5 +18,5 @@ xattr -d com.apple.quarantine macos/libailia_llm.dylib
 
 ## API specification
 
-https://github.com/axinc-ai/ailia-sdk
+https://github.com/ailia-ai/ailia-sdk
 
