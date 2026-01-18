@@ -182,33 +182,59 @@ typedef struct _AILIALLMChatMessage {
 
 /**
  * \~japanese
- * @brief マルチモーダル用のメディアデータ構造体。オーディオキーワード、raw data入力は現在は未サポートで、将来的な実装のために予約されています。画像の対応フォーマットはJPG、PNG、TGA、BMP、PSD、GIF、HDR、PICです。
+ * @brief マルチモーダル用のメディアデータ構造体。オーディオは現在未サポートで、将来的な実装のために予約されています。
+ *        画像はファイルパス、エンコード済みバッファ（JPG、PNG等）、またはRaw RGBデータから読み込み可能です。
+ *        エンコード済みバッファの対応フォーマットはJPG、PNG、TGA、BMP、PSD、GIF、HDR、PICです。
  * \~english
- * @brief Media data structure for multimodal processing. Audio keywords and raw data input are currently unsupported and reserved for future implementation. Supported image formats are JPG, PNG, TGA, BMP, PSD, GIF, HDR, and PIC.
+ * @brief Media data structure for multimodal processing. Audio is currently unsupported and reserved for future implementation.
+ *        Images can be loaded from file path, encoded buffer (JPG, PNG, etc.), or raw RGB data.
+ *        Supported encoded buffer formats are JPG, PNG, TGA, BMP, PSD, GIF, HDR, and PIC.
  */
 typedef struct _AILIALLMMediaData {
     /**
-     * @brief Media type (image, audio). "audio" keywards are reserved for future use, currently unsupported.
+     * \~japanese
+     * @brief メディアタイプ（image, audio）。"audio"は将来の実装のために予約されており、現在はサポートされていません。
+     * \~english
+     * @brief Media type (image, audio). "audio" keywords are reserved for future use, currently unsupported.
      */
     const char *media_type;
     /**
-     * @brief Path to the media file (utf8).
+     * \~japanese
+     * @brief メディアファイルへのパス（UTF-8）。dataが指定されている場合は無視されます。
+     * \~english
+     * @brief Path to the media file (UTF-8). Ignored if data is provided.
      */
     const char *file_path;
     /**
-     * @brief Optional: Raw media data (alternative to file_path). Currently unsupported, reserved for future use.
+     * \~japanese
+     * @brief オプション：バッファからの画像データ（file_pathの代替）。
+     *        width/heightが0の場合はエンコード済みファイルバッファ（JPG、PNG等）として扱われます。
+     *        width/heightが指定されている場合はRaw RGBデータ（width * height * 3バイト）として扱われます。
+     * \~english
+     * @brief Optional: Image data from buffer (alternative to file_path).
+     *        If width/height are 0, treated as encoded file buffer (JPG, PNG, etc.).
+     *        If width/height are specified, treated as raw RGB data (width * height * 3 bytes).
      */
     const unsigned char *data;
     /**
-     * @brief Size of the raw data (used with data parameter)
+     * \~japanese
+     * @brief バッファのサイズ（dataパラメータと共に使用）
+     * \~english
+     * @brief Size of the buffer (used with data parameter)
      */
     unsigned int data_size;
     /**
-     * @brief Width for images (pixels), sample count for audio
+     * \~japanese
+     * @brief 画像の幅（ピクセル）。Raw RGBデータの場合のみ指定。エンコード済みバッファの場合は0を指定。
+     * \~english
+     * @brief Width for images (pixels). Only specify for raw RGB data. Set to 0 for encoded buffer.
      */
     unsigned int width;
     /**
-     * @brief Height for images (pixels), unused for audio (set to 0)
+     * \~japanese
+     * @brief 画像の高さ（ピクセル）。Raw RGBデータの場合のみ指定。エンコード済みバッファの場合は0を指定。
+     * \~english
+     * @brief Height for images (pixels). Only specify for raw RGB data. Set to 0 for encoded buffer.
      */
     unsigned int height;
 } AILIALLMMediaData;
@@ -588,7 +614,8 @@ AILIA_LLM_API int ailiaLLMGetMultimodalCapabilities(struct AILIALLM* llm, unsign
  *   マルチモーダル対応のプロンプトを設定します。メッセージのcontentに<__media__>プレースホルダーを含め、
  *   対応するメディアデータをmedia_dataに設定してください。
  *   例: "この画像について説明してください: <__media__>"
- *   messageの内容は内部でコピーされるため、呼び出し後に開放することができます。raw_data入力は現在未サポートです。
+ *   messageの内容は内部でコピーされるため、呼び出し後に開放することができます。
+ *   画像はファイルパス、エンコード済みバッファ（JPG、PNG等）、またはRaw RGBデータから読み込み可能です。
  *
  * \~english
  * @brief Set multimodal prompt.
@@ -602,7 +629,7 @@ AILIA_LLM_API int ailiaLLMGetMultimodalCapabilities(struct AILIALLM* llm, unsign
  *   and set corresponding media data in media_data.
  *   Example: "Describe this image: <__media__>"
  *   The content of message is copied internally, so it can be freed after the call.
- *   Raw data input is currently unsupported.
+ *   Images can be loaded from file path, encoded buffer (JPG, PNG, etc.), or raw RGB data.
  */
 AILIA_LLM_API int ailiaLLMSetMultimodalPrompt(struct AILIALLM* llm, const AILIALLMMultimodalChatMessage * message, unsigned int message_cnt);
 
