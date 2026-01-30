@@ -2,14 +2,14 @@
  * \~japanese
  * @file ailia_llm.h
  * @brief LLM推論ライブラリ
- * @copyright AXELL CORPORATION, ax Inc.
- * @date 2024/09/27
+ * @copyright AXELL CORPORATION, ailia Inc.
+ * @date 2026/01/29
  *
  * \~english
  * @file ailia_llm.h
  * @brief LLM inference library
- * @copyright AXELL CORPORATION, ax Inc.
- * @date September 27, 2024
+ * @copyright AXELL CORPORATION, ailia Inc.
+ * @date January 29, 2026
  */
 
 #ifndef INCLUDED_AILIA_LLM

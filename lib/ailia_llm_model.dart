@@ -1,8 +1,3 @@
-// ailia_llm.dartはffigenで自動生成される。
-// 一方このailia_model.dartはailia_llm.dartをラップして、よりDartらしいインターフェースを提供するもので、APIの更新に伴って手動で更新する必要がある。
-// TODO : AiliaLLMModelを提供し続ける場合は、このクラスの検証を行うテストコードがリポジトリ内に必要。
-// もしくはAiliaLLMModelはこのbindingsからは提供せず、API利用側で実装するようにする。
-
 import 'dart:ffi';
 import 'dart:convert';
 import 'dart:typed_data';
