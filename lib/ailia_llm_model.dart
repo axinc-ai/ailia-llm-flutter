@@ -126,6 +126,9 @@ class AiliaLLMModel {
       }
     }
 
+    // Reset multimodal projector state when opening a new model
+    _multimodalProjectorOpened = false;
+
     if (backend == "") {
       backend = _backend[1][0];
     }
@@ -181,6 +184,8 @@ class AiliaLLMModel {
       malloc.free(pLLm);
       pLLm = nullptr;
     }
+    // Reset multimodal projector state when closing the model
+    _multimodalProjectorOpened = false;
   }
 
   void setSamplingParams(int top_k, double top_p, double temp, int dist) {
@@ -531,10 +536,8 @@ class AiliaLLMModel {
   /// - 'media_data' (List<Map<String, dynamic>>, optional): Media attachments
   @Deprecated('Use setPrompt() instead, which automatically detects media_data in messages.')
   void setMultimodalPrompt(List<Map<String, dynamic>> messages) {
-    if (pLLm == nullptr) {
-      throw Exception("ailia LLM not initialized.");
-    }
-
-    _setMultimodalPromptInternal(messages);
+    // Delegate to the unified setPrompt() method to ensure consistent behavior
+    // and projector-loaded checks.
+    setPrompt(messages);
   }
 }
