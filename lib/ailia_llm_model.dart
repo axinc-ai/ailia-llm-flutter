@@ -61,6 +61,7 @@ class AiliaLLMModel {
   bool _contextFull = false;
   Uint8List _buf = Uint8List(0);
   String _beforeText = "";
+  bool _multimodalProjectorOpened = false;
 
   AiliaLLMModel() {}
 
@@ -121,9 +122,12 @@ class AiliaLLMModel {
   void open(String modelPath, int nCtx, {String backend = ""}) {
     if (pLLm != nullptr) {
       if (pLLm.value != nullptr) {
-        dllHandle.ailiaLLMDestory(pLLm.value);
+        dllHandle.ailiaLLMDestroy(pLLm.value);
       }
     }
+
+    // Reset multimodal projector state when opening a new model
+    _multimodalProjectorOpened = false;
 
     if (backend == "") {
       backend = _backend[1][0];
@@ -180,6 +184,8 @@ class AiliaLLMModel {
       malloc.free(pLLm);
       pLLm = nullptr;
     }
+    // Reset multimodal projector state when closing the model
+    _multimodalProjectorOpened = false;
   }
 
   void setSamplingParams(int top_k, double top_p, double temp, int dist) {
@@ -194,15 +200,62 @@ class AiliaLLMModel {
     }
   }
 
-  /// Set the prompt to be process by the model.
+  /// Check if any message in the list contains media_data.
+  bool _hasMediaData(List<Map<String, dynamic>> messages) {
+    for (var message in messages) {
+      if (message.containsKey('media_data') && message['media_data'] != null) {
+        final mediaData = message['media_data'];
+        if (mediaData is List && mediaData.isNotEmpty) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Set the prompt to be processed by the model.
   /// The prompt will be formatted according to the selected format.
-  /// messages must be an array of object with two string properties
-  /// named 'role' and 'content'.
+  ///
+  /// This unified method automatically detects if any message contains
+  /// 'media_data' and routes to the appropriate internal API:
+  /// - If media_data is present: uses SetMultimodalPrompt (requires projector to be loaded)
+  /// - If no media_data: uses SetPrompt (text-only path)
+  ///
+  /// messages must be a list of maps with the following properties:
+  /// - 'role' (String): The role (e.g., "system", "user", "assistant")
+  /// - 'content' (String): The text content of the message
+  /// - 'media_data' (List<Map<String, dynamic>>, optional): Media attachments, each containing:
+  ///   - 'media_type' (String): Type of media (e.g., "image")
+  ///   - 'file_path' (String): Path to the media file
+  ///   - 'width' (int, optional): Media width in pixels
+  ///   - 'height' (int, optional): Media height in pixels
+  ///
+  /// Throws an Exception if media_data is provided but multimodal projector
+  /// is not loaded. Call openMultimodalProjectorFile() first in that case.
   void setPrompt(List<Map<String, dynamic>> messages) {
     if (pLLm == nullptr) {
       throw Exception("ailia LLM not initialized.");
     }
 
+    bool hasMedia = _hasMediaData(messages);
+
+    // If media_data exists, check that the multimodal projector is loaded
+    if (hasMedia) {
+      if (!_multimodalProjectorOpened) {
+        throw Exception(
+            "media_data was provided but multimodal projector is not loaded. "
+            "Call openMultimodalProjectorFile() first to enable multimodal generation.");
+      }
+      // Use multimodal path
+      _setMultimodalPromptInternal(messages);
+    } else {
+      // Use text-only path
+      _setTextPromptInternal(messages);
+    }
+  }
+
+  /// Internal implementation for text-only prompts.
+  void _setTextPromptInternal(List<Map<String, dynamic>> messages) {
     // Allocate an array of ailia_llm_chat_message_t and initialize it
     // with the messages data.
     final messagesPtr =
@@ -334,5 +387,157 @@ class AiliaLLMModel {
     int retCount = count.value;
     malloc.free(count);
     return retCount;
+  }
+
+  // Open multimodal projector file
+  void openMultimodalProjectorFile(String mmprojPath) {
+    if (pLLm == nullptr) {
+      throw Exception("ailia LLM not initialized.");
+    }
+
+    int status;
+    if (Platform.isWindows) {
+      Pointer<WChar> path = mmprojPath.toNativeUtf16().cast<WChar>();
+      status = dllHandle.ailiaLLMOpenMultimodalProjectorFileW(pLLm.value, path);
+      malloc.free(path);
+    } else {
+      Pointer<Char> path = mmprojPath.toNativeUtf8().cast<Char>();
+      status = dllHandle.ailiaLLMOpenMultimodalProjectorFileA(pLLm.value, path);
+      malloc.free(path);
+    }
+    if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
+      throw Exception("ailiaLLMOpenMultimodalProjectorFile returned an error status $status");
+    }
+    _multimodalProjectorOpened = true;
+  }
+
+  // Get multimodal capabilities
+  Map<String, bool> getMultimodalCapabilities() {
+    if (pLLm == nullptr) {
+      throw Exception("ailia LLM not initialized.");
+    }
+
+    final Pointer<UnsignedInt> visionSupport = malloc<UnsignedInt>();
+    final Pointer<UnsignedInt> audioSupport = malloc<UnsignedInt>();
+
+    int status = dllHandle.ailiaLLMGetMultimodalCapabilities(pLLm.value, visionSupport, audioSupport);
+
+    bool vision = visionSupport.value != 0;
+    bool audio = audioSupport.value != 0;
+
+    malloc.free(visionSupport);
+    malloc.free(audioSupport);
+
+    if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
+      throw Exception("ailiaLLMGetMultimodalCapabilities returned an error status $status");
+    }
+
+    return {"vision": vision, "audio": audio};
+  }
+
+  /// Internal implementation for multimodal prompts.
+  void _setMultimodalPromptInternal(List<Map<String, dynamic>> messages) {
+    // Allocate an array of AILIALLMMultimodalChatMessage and initialize it
+    final messagesPtr = calloc<ailia_llm_dart.AILIALLMMultimodalChatMessage>(messages.length);
+
+    try {
+      for (var i = 0; i < messages.length; i++) {
+        if (!messages[i].containsKey("content")) {
+          throw Exception("missing 'content' property");
+        }
+        if (!messages[i].containsKey("role")) {
+          throw Exception("missing 'role' property");
+        }
+
+        final content = messages[i]['content'] as String;
+        final role = messages[i]['role'] as String;
+        final p = messagesPtr[i];
+
+        p.content = content.toNativeUtf8().cast<Char>();
+        p.role = role.toNativeUtf8().cast<Char>();
+
+        // Handle media data if present
+        if (messages[i].containsKey('media_data') && messages[i]['media_data'] != null) {
+          final mediaList = messages[i]['media_data'] as List<Map<String, dynamic>>;
+          if (mediaList.isNotEmpty) {
+            final mediaPtr = calloc<ailia_llm_dart.AILIALLMMediaData>(mediaList.length);
+            p.media_data = mediaPtr;
+            p.media_count = mediaList.length;
+
+            for (var j = 0; j < mediaList.length; j++) {
+              final media = mediaList[j];
+              final mediaData = mediaPtr[j];
+
+              mediaData.media_type = (media['media_type'] as String).toNativeUtf8().cast<Char>();
+              mediaData.file_path = (media['file_path'] as String).toNativeUtf8().cast<Char>();
+              mediaData.data = nullptr;
+              mediaData.data_size = 0;
+              mediaData.width = media['width'] ?? 0;
+              mediaData.height = media['height'] ?? 0;
+            }
+          } else {
+            p.media_data = nullptr;
+            p.media_count = 0;
+          }
+        } else {
+          p.media_data = nullptr;
+          p.media_count = 0;
+        }
+      }
+
+      _contextFull = false;
+      _buf = Uint8List(0);
+      _beforeText = "";
+
+      int status = dllHandle.ailiaLLMSetMultimodalPrompt(pLLm.value, messagesPtr, messages.length);
+      if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
+        if (status == ailia_llm_dart.AILIA_LLM_STATUS_CONTEXT_FULL) {
+          _contextFull = true;
+          return;
+        }
+        throw Exception("ailiaLLMSetMultimodalPrompt returned an error status $status");
+      }
+    } finally {
+      // free strings and media data
+      for (var i = 0; i < messages.length; i++) {
+        final p = messagesPtr[i];
+        if (p.content != nullptr) {
+          malloc.free(p.content);
+        }
+        if (p.role != nullptr) {
+          malloc.free(p.role);
+        }
+        if (p.media_data != nullptr) {
+          for (var j = 0; j < p.media_count; j++) {
+            final mediaData = p.media_data[j];
+            if (mediaData.media_type != nullptr) {
+              malloc.free(mediaData.media_type);
+            }
+            if (mediaData.file_path != nullptr) {
+              malloc.free(mediaData.file_path);
+            }
+          }
+          malloc.free(p.media_data);
+        }
+      }
+      malloc.free(messagesPtr);
+    }
+  }
+
+  /// Set multimodal prompt for generation with media attachments.
+  ///
+  /// @deprecated Use [setPrompt] instead. This method is deprecated and will
+  /// be removed in a future version. The unified [setPrompt] method
+  /// automatically detects media_data in messages and routes accordingly.
+  ///
+  /// messages must be a list of maps with the following properties:
+  /// - 'role' (String): The role (e.g., "system", "user", "assistant")
+  /// - 'content' (String): The text content with <__media__> placeholders
+  /// - 'media_data' (List<Map<String, dynamic>>, optional): Media attachments
+  @Deprecated('Use setPrompt() instead, which automatically detects media_data in messages.')
+  void setMultimodalPrompt(List<Map<String, dynamic>> messages) {
+    // Delegate to the unified setPrompt() method to ensure consistent behavior
+    // and projector-loaded checks.
+    setPrompt(messages);
   }
 }
