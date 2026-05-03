@@ -200,20 +200,6 @@ class AiliaLLMModel {
     }
   }
 
-  /// Enable or disable thinking (reasoning output).
-  /// Controls whether thinking models (e.g. Gemma4) output their reasoning process.
-  /// Must be called before setPrompt.
-  void setThinking(bool enable) {
-    if (pLLm == nullptr) {
-      throw Exception("ailia LLM not initialized.");
-    }
-
-    var status = dllHandle.ailiaLLMSetThinking(pLLm.value, enable ? 1 : 0);
-    if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
-      throw Exception("ailiaLLMSetThinking returned an error status $status");
-    }
-  }
-
   /// Check if any message in the list contains media_data.
   bool _hasMediaData(List<Map<String, dynamic>> messages) {
     for (var message in messages) {

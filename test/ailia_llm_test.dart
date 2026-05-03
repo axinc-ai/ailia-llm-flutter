@@ -62,13 +62,6 @@ void main() {
       );
     });
 
-    test('setThinking throws exception when LLM not initialized', () {
-      expect(
-        () => model.setThinking(true),
-        throwsException,
-      );
-    });
-
     test('openMultimodalProjectorFile throws exception when LLM not initialized', () {
       expect(
         () => model.openMultimodalProjectorFile('invalid_path.gguf'),
@@ -140,23 +133,6 @@ void main() {
       model.open(modelPath, nCtx);
       expect(
         () => model.setSamplingParams(1, 0.98, 0.05, 3939),
-        returnsNormally,
-      );
-    });
-
-    test('setThinking sets parameter successfully', () {
-      expect(modelPath, isNotEmpty,
-        reason: 'Model path not set. Set AILIA_LLM_MODEL_PATH environment variable.');
-      expect(File(modelPath).existsSync(), isTrue,
-        reason: 'Model file not found at $modelPath');
-
-      model.open(modelPath, nCtx);
-      expect(
-        () => model.setThinking(true),
-        returnsNormally,
-      );
-      expect(
-        () => model.setThinking(false),
         returnsNormally,
       );
     });
