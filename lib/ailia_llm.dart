@@ -143183,41 +143183,6 @@ class ailiaLlmFFI {
           int Function(ffi.Pointer<AILIALLM>, int, double, double, int)>();
 
   /// \~japanese
-  /// @brief Thinkingモデル（Gemma4等）の推論過程の出力を制御します。
-  /// @param llm LLMオブジェクトポインタへのポインタ
-  /// @param enable 0で無効、0以外で有効（デフォルト: 無効）
-  /// @return
-  /// 成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
-  /// @details
-  /// Thinkingモデル（Gemma4等）の推論過程の出力を制御します。ailiaLLMSetPromptの前に実行する必要があります。
-  ///
-  /// \~english
-  /// @brief Enable or disable thinking (reasoning output).
-  /// @param llm A pointer to the LLM instance pointer
-  /// @param enable 0 to disable, non-zero to enable (default: disabled)
-  /// @return
-  /// If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
-  /// @details
-  /// Controls whether thinking models (e.g. Gemma4) output their reasoning process.
-  /// Must be called before ailiaLLMSetPrompt.
-  int ailiaLLMSetThinking(
-    ffi.Pointer<AILIALLM> llm,
-    int enable,
-  ) {
-    return _ailiaLLMSetThinking(
-      llm,
-      enable,
-    );
-  }
-
-  late final _ailiaLLMSetThinkingPtr = _lookup<
-      ffi.NativeFunction<
-          ffi.Int Function(
-              ffi.Pointer<AILIALLM>, ffi.UnsignedInt)>>('ailiaLLMSetThinking');
-  late final _ailiaLLMSetThinking = _ailiaLLMSetThinkingPtr
-      .asFunction<int Function(ffi.Pointer<AILIALLM>, int)>();
-
-  /// \~japanese
   /// @brief プロンプトを設定します。
   /// @param llm LLMオブジェクトポインタへのポインタ
   /// @param message メッセージの配列
