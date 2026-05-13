@@ -362,6 +362,66 @@ void main() {
     });
   });
 
+  group('AiliaLLMModel Thinking Tests', () {
+    late String thinkingModelPath;
+
+    setUpAll(() {
+      thinkingModelPath = Platform.environment['AILIA_LLM_TEST_THINKING_MODEL_PATH'] ?? '';
+    });
+
+    String generateText(AiliaLLMModel m, int maxTokens) {
+      final sb = StringBuffer();
+      int count = 0;
+      while (count < maxTokens) {
+        final delta = m.generate();
+        if (delta == null) break;
+        sb.write(delta);
+        count++;
+      }
+      return sb.toString();
+    }
+
+    test('setThinking output differs with Gemma4 E2B', () {
+      expect(thinkingModelPath, isNotEmpty,
+        reason: 'Thinking model path not set. Set AILIA_LLM_TEST_THINKING_MODEL_PATH environment variable.');
+      expect(File(thinkingModelPath).existsSync(), isTrue,
+        reason: 'Thinking model file not found at $thinkingModelPath');
+
+      final messages = [
+        {'role': 'user', 'content': 'What is the capital of France?'}
+      ];
+
+      // Thinking OFF
+      final modelOff = AiliaLLMModel();
+      modelOff.open(thinkingModelPath, 2048);
+      modelOff.setSamplingParams(1, 0.0, 0.0, 42);
+      modelOff.setThinking(false);
+      modelOff.setPrompt(messages);
+      final responseOff = generateText(modelOff, 100);
+      modelOff.close();
+
+      // Thinking ON
+      final modelOn = AiliaLLMModel();
+      modelOn.open(thinkingModelPath, 2048);
+      modelOn.setSamplingParams(1, 0.0, 0.0, 42);
+      modelOn.setThinking(true);
+      modelOn.setPrompt(messages);
+      final responseOn = generateText(modelOn, 100);
+      modelOn.close();
+
+      print('Thinking OFF: $responseOff');
+      print('Thinking ON: $responseOn');
+
+      expect(responseOff, isNotEmpty);
+      expect(responseOn, isNotEmpty);
+      expect(responseOn.contains('<think>') || responseOn.contains('thought'), isTrue,
+        reason: 'Thinking ON response should contain thinking marker (<think> or thought)');
+      expect(responseOff.contains('<think>') || responseOff.contains('<|channel>thought'), isFalse,
+        reason: 'Thinking OFF response should not contain thinking marker');
+      expect(responseOff, isNot(equals(responseOn)));
+    });
+  });
+
   group('AiliaLLMModel Multimodal Tests', () {
     late AiliaLLMModel model;
     late String modelPath;
