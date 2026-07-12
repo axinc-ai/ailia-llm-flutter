@@ -10,6 +10,7 @@ import 'ailia_llm.dart' as ailia_llm_dart;
 const String BACKEND_CPU = "CPU";
 const String BACKEND_VULKAN = "Vulkan";
 const String BACKEND_METAL = "Metal";
+const String BACKEND_OPENCL = "OpenCL";
 
 List<List<String>> _ailiaCommonGetLlmPath() {
   if (Platform.isAndroid || Platform.isLinux) {
@@ -25,9 +26,11 @@ List<List<String>> _ailiaCommonGetLlmPath() {
     ];
   }
   if (Platform.isWindows) {
+    // On arm64, ailia_llm.dll is built with OpenCL instead of Vulkan
+    final bool isArm64 = Abi.current() == Abi.windowsArm64;
     return [
       ['ailia_llm_fallback.dll', 'ailia_llm.dll'],
-      [BACKEND_CPU, BACKEND_VULKAN]
+      [BACKEND_CPU, isArm64 ? BACKEND_OPENCL : BACKEND_VULKAN]
     ];
   }
   return [
@@ -130,7 +133,11 @@ class AiliaLLMModel {
     _multimodalProjectorOpened = false;
 
     if (backend == "") {
-      backend = _backend[1][0];
+      List<String> backendList = getBackendList();
+      if (backendList.isEmpty) {
+        throw Exception("ailiaLLM no available backend found");
+      }
+      backend = backendList[0];
     }
 
     if (_currentBackend != backend) {
