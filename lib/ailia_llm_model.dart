@@ -130,7 +130,11 @@ class AiliaLLMModel {
     _multimodalProjectorOpened = false;
 
     if (backend == "") {
-      backend = _backend[1][0];
+      List<String> backendList = getBackendList();
+      if (backendList.isEmpty) {
+        throw Exception("ailiaLLM no available backend found");
+      }
+      backend = backendList[0];
     }
 
     if (_currentBackend != backend) {
