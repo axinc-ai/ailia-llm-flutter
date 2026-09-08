@@ -69,6 +69,35 @@ void main() {
       );
     });
 
+    test('setTools throws exception when LLM not initialized', () {
+      expect(
+        () => model.setTools([
+          {
+            'type': 'function',
+            'function': {'name': 'get_weather', 'parameters': {}}
+          }
+        ]),
+        throwsException,
+      );
+    });
+
+    test('setPrompt with tool messages throws exception when LLM not initialized', () {
+      expect(
+        () => model.setPrompt([
+          {'role': 'user', 'content': 'Weather?'},
+          {'role': 'tool', 'content': 'Sunny'}
+        ]),
+        throwsException,
+      );
+    });
+
+    test('parseResponse throws exception when LLM not initialized', () {
+      expect(
+        () => model.parseResponse('Hello'),
+        throwsException,
+      );
+    });
+
     test('openMultimodalProjectorFile throws exception when LLM not initialized', () {
       expect(
         () => model.openMultimodalProjectorFile('invalid_path.gguf'),
