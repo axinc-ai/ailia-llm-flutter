@@ -463,6 +463,8 @@ AILIA_LLM_API int ailiaLLMSetThinking(struct AILIALLM* llm, unsigned int enable)
  * @details
  *   LLMに問い合わせるプロンプトを設定します。
  *   ChatHistoryもmessageに含めてください。
+ *   ツール設定中はINVALID_STATEを返します。最初のuserメッセージからailiaLLMSetPromptJsonを使用してください。
+ *   ailiaLLMSetToolsでツールを解除すると本APIを再び使用できます。
  *   messageの内容は内部でコピーされるため、呼び出し後に開放することができます。
  *
  * \~english
@@ -475,9 +477,18 @@ AILIA_LLM_API int ailiaLLMSetThinking(struct AILIALLM* llm, unsigned int enable)
  * @details
  *   Set the prompt to query the LLM.
  *   Please include ChatHistory in the message as well.
+ *   Returns INVALID_STATE while tools are configured. Use ailiaLLMSetPromptJson from the first user message.
+ *   Clear tools with ailiaLLMSetTools to use this API again.
  *   The contents of the message are copied internally, so you can free them after the call.
  */
 AILIA_LLM_API int ailiaLLMSetPrompt(struct AILIALLM* llm, const AILIALLMChatMessage * message, unsigned int message_cnt);
+
+
+
+
+
+
+
 
 /**
  * \~japanese
@@ -605,6 +616,17 @@ AILIA_LLM_API int ailiaLLMGetPromptTokenCount(struct AILIALLM* llm, unsigned int
  */
 AILIA_LLM_API int ailiaLLMGetGeneratedTokenCount(struct AILIALLM* llm, unsigned int *cnt);
 
+/**
+ * \~japanese
+ * @brief LLMオブジェクトを破棄します。
+ * @param llm LLMオブジェクトポインタ
+ *
+ * \~english
+ * @brief It destroys the LLM instance.
+ * @param llm A LLM instance pointer
+ */
+AILIA_LLM_API void ailiaLLMDestroy(struct AILIALLM* llm);
+
 /****************************************************************
  * マルチモーダル LLM API
  **/
@@ -684,137 +706,122 @@ AILIA_LLM_API int ailiaLLMGetMultimodalCapabilities(struct AILIALLM* llm, unsign
  *   Example: "Describe this image: <__media__>"
  *   The content of message is copied internally, so it can be freed after the call.
  *   Images can be loaded from file path, encoded buffer (JPG, PNG, etc.), or raw RGB data.
+ * @note With tools configured, returns INVALID_STATE. Use ailiaLLMSetPromptJson for tool use with media.
  */
 AILIA_LLM_API int ailiaLLMSetMultimodalPrompt(struct AILIALLM* llm, const AILIALLMMultimodalChatMessage * message, unsigned int message_cnt);
 
 /****************************************************************
- * Tool Use (Function Calling) API
+ * TOOL USE API
  **/
 
 /**
  * \~japanese
- * @brief ツール（関数）の定義を設定します。
- * @param llm LLMオブジェクトポインタ
- * @param tools_json OpenAI互換のツール定義JSON配列（UTF-8）。NULLまたは空文字列で解除します。
- * @return
- *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
- * @details
- *   OpenAI Chat Completions APIのtoolsパラメータと同じ形式でツールを定義します。
- *   例: [{"type":"function","function":{"name":"get_weather","description":"...","parameters":{"type":"object","properties":{...},"required":[...]}}}]
- *   設定したツールは、次回のailiaLLMSetPrompt / ailiaLLMSetMultimodalPromptの呼び出し時にチャットテンプレート経由でプロンプトへ展開されます。
- *   ツールが設定されている場合、モデルの出力はツール呼び出し構文のgrammarで制約されます。
- *   生成されたテキスト（ailiaLLMGetDeltaTextで取得した生の出力を連結したもの）は、ailiaLLMParseResponseで
- *   ツール呼び出しを含む構造化データに変換できます。
- *
- *   ツールが設定されている間、ailiaLLMSetPrompt / ailiaLLMSetMultimodalPromptに渡すメッセージは次のように解釈されます。
- *   - role "assistant": contentにはモデルの生の出力（ailiaLLMGetDeltaTextの連結）をそのまま指定します。
- *     内部でailiaLLMParseResponseと同じ解析を行い、ツール呼び出しやThinkingをチャットテンプレートに合わせて再構成します。
- *     解析に失敗した場合は \ref AILIA_LLM_STATUS_PARSE_ERROR を返します。
- *   - role "tool": contentにはツールの実行結果をテキスト（またはJSON文字列）でそのまま指定します。
- *     toolメッセージは直前のassistantメッセージのツール呼び出しと順序で対応付けられ、ツール名も自動的に補われます。
- *     Gemma 4のようにtoolロールを持たないモデルでも、チャットテンプレートに合わせて内部で変換されます。
- *   ツールが設定されていない状態でrole "tool" のメッセージを渡した場合は \ref AILIA_LLM_STATUS_INVALID_STATE を返します。
- *   Gemma 4など、チャットテンプレートがツール呼び出しに対応しているモデルで使用できます。
- *   JSONが不正な場合は \ref AILIA_LLM_STATUS_INVALID_ARGUMENT を返します。
- *
+ * @brief OpenAI互換のツール定義JSON配列を設定します。NULL/空文字列/空配列で解除します。
+ * @param llm LLMオブジェクト
+ * @param tools_json UTF-8のツール定義
+ * @details tools設定中はSetPrompt/SetMultimodalPromptがINVALID_STATEを返します。
+ *   最初のuser入力からSetPromptJsonを使用し、Generateで生成後、GetResponseJsonでassistant JSONを取得します。
+ *   deltaはプレビュー用です。アプリ側で連結する必要はありません。結果はtool_call_idで返します。
+ *   設定変更後は新しいプロンプトを設定してください。不正な定義はINVALID_ARGUMENTです。
  * \~english
- * @brief Set the tool (function) definitions.
- * @param llm A LLM instance pointer
- * @param tools_json OpenAI-compatible JSON array of tool definitions (UTF-8). Pass NULL or an empty string to clear.
- * @return
- *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
- * @details
- *   Tools are defined in the same format as the tools parameter of the OpenAI Chat Completions API.
- *   Example: [{"type":"function","function":{"name":"get_weather","description":"...","parameters":{"type":"object","properties":{...},"required":[...]}}}]
- *   The tools are rendered into the prompt through the chat template on the next call to
- *   ailiaLLMSetPrompt / ailiaLLMSetMultimodalPrompt.
- *   While tools are set, the model output is constrained by a grammar for the tool call syntax.
- *   The generated text (the concatenation of the raw output obtained with ailiaLLMGetDeltaText) can be
- *   converted into structured data including the tool calls with ailiaLLMParseResponse.
- *
- *   While tools are set, the messages passed to ailiaLLMSetPrompt / ailiaLLMSetMultimodalPrompt are interpreted as follows.
- *   - role "assistant": content is the raw model output (concatenation of ailiaLLMGetDeltaText) as is.
- *     It is parsed internally in the same way as ailiaLLMParseResponse, and the tool calls and thinking
- *     are re-rendered according to the chat template. \ref AILIA_LLM_STATUS_PARSE_ERROR is returned if the parsing fails.
- *   - role "tool": content is the tool result as text (or a JSON string) as is.
- *     Tool messages are matched to the tool calls of the preceding assistant message by order, and the tool name is filled in automatically.
- *     For models without a tool role (e.g. Gemma 4), the messages are converted internally to match the chat template.
- *   Passing a role "tool" message while no tools are set returns \ref AILIA_LLM_STATUS_INVALID_STATE .
- *   Available for models whose chat template supports tool calling (e.g. Gemma 4).
- *   Returns \ref AILIA_LLM_STATUS_INVALID_ARGUMENT if the JSON is invalid.
+ * @brief Sets OpenAI-compatible tool definitions. NULL, empty string or array clears tools.
+ * @param llm LLM instance
+ * @param tools_json UTF-8 tool definition array
+ * @details SetPrompt/SetMultimodalPrompt return INVALID_STATE while tools are configured.
+ *   Use SetPromptJson from the first user input, generate, then retrieve assistant JSON with GetResponseJson.
+ *   Deltas are optional previews; no concatenation is required. Return results using tool_call_id.
+ *   Set a new prompt after changing tools. Invalid definitions return INVALID_ARGUMENT.
  */
 AILIA_LLM_API int ailiaLLMSetTools(struct AILIALLM* llm, const char *tools_json);
 
 /**
  * \~japanese
- * @brief 生成テキストを構造化した結果のJSONの長さを取得します。(NULL文字含む)
- * @param llm       LLMオブジェクトポインタ
- * @param text      モデルの生の出力テキスト(UTF8)
- * @param buf_size  JSONの長さ
- * @return
- *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
- *
- * \~english
- * @brief Gets the size of the JSON obtained by parsing the generated text. (Include null)
- * @param llm       A LLM instance pointer
- * @param text      Raw output text of the model (UTF8)
- * @param buf_size  The length of the JSON
- * @return
- *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
- */
-AILIA_LLM_API int ailiaLLMParseResponseSize(struct AILIALLM* llm, const char *text, unsigned int *buf_size);
-
-/**
- * \~japanese
- * @brief モデルの生の出力テキストを解析し、OpenAI互換のassistantメッセージJSONに変換します。
- * @param llm       LLMオブジェクトポインタ
- * @param text      モデルの生の出力テキスト(UTF8)。ailiaLLMGetDeltaTextで取得したテキストを生成完了まで連結したもの。
- * @param json      JSON(UTF8)
- * @param buf_size  バッファサイズ
- * @return
- *   成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
- * @details
- *   textをモデルのチャットテンプレートと現在のツール定義（ailiaLLMSetTools）に基づいて解析し、
- *   {"role":"assistant","content":"...","reasoning_content":"...","tool_calls":[{"id":"call_0","type":"function","function":{"name":"...","arguments":"{...}"}}]}
- *   の形式で返します。reasoning_contentはThinkingの出力が含まれる場合のみ、tool_callsはツール呼び出しが含まれる場合のみ出力されます。
- *   argumentsはJSON文字列です。tool_callsのidはメッセージ内の出現順に"call_0", "call_1", ...となります。
- *   解析器はailiaLLMSetPromptの呼び出し時に、そのときのツール定義とThinking設定から生成されます。
- *   ailiaLLMSetPromptを一度も呼び出していない場合、またはailiaLLMSetTools / ailiaLLMSetThinkingの後に
- *   ailiaLLMSetPromptを呼び出していない場合は \ref AILIA_LLM_STATUS_INVALID_STATE を返します。
- *   textがツール呼び出し構文と一致しない場合（生成途中のテキストを含む）は \ref AILIA_LLM_STATUS_PARSE_ERROR を返します。
- *
- * \~english
- * @brief Parses the raw output text of the model into an OpenAI-compatible assistant message JSON.
- * @param llm       A LLM instance pointer
- * @param text      Raw output text of the model (UTF8), i.e. the concatenation of the text obtained with ailiaLLMGetDeltaText until the generation is complete.
- * @param json      JSON(UTF8)
- * @param buf_size  Buffer size
- * @return
- *   If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
- * @details
- *   Parses text according to the chat template of the model and the current tool definitions (ailiaLLMSetTools), and returns
- *   {"role":"assistant","content":"...","reasoning_content":"...","tool_calls":[{"id":"call_0","type":"function","function":{"name":"...","arguments":"{...}"}}]}.
- *   reasoning_content is present only when the text contains thinking output, and tool_calls only when it contains tool calls.
- *   arguments is a JSON string. The ids of tool_calls are "call_0", "call_1", ... in order of appearance within the message.
- *   The parser is built when ailiaLLMSetPrompt is called, from the tool definitions and the thinking setting at that time.
- *   If ailiaLLMSetPrompt has never been called, or has not been called after ailiaLLMSetTools / ailiaLLMSetThinking,
- *   the function returns \ref AILIA_LLM_STATUS_INVALID_STATE .
- *   If text does not match the tool call syntax (including the text of an unfinished generation),
- *   the function returns \ref AILIA_LLM_STATUS_PARSE_ERROR .
- */
-AILIA_LLM_API int ailiaLLMParseResponse(struct AILIALLM* llm, const char *text, char *json, unsigned int buf_size);
-
-/**
- * \~japanese
- * @brief LLMオブジェクトを破棄します。
+ * @brief 構造化されたJSON会話履歴からプロンプトを設定します。
  * @param llm LLMオブジェクトポインタ
- *
+ * @param messages_json UTF-8の空でないメッセージJSON配列（NULL終端）
+ * @details
+ *   roleはsystem/user/assistant/tool、contentは文字列またはnullです。userはcontent配列にも対応します。
+ *   配列要素は{"type":"text","text":"..."}、またはtypeがimage/audioでfile_path（ローカルファイル）か
+ *   data（標準Base64のエンコード済みファイル）を1つ指定します。JPEG/PNG、WAV/MP3/FLAC等に対応します。
+ *   メディアは対応projectorの読込が必要です。URL取得・生PCM/RGB・動画には対応しません。
+ *   配列順に入力し、画像/音声を含む履歴は毎回評価します。
+ *   assistantのcontentをモデル固有構文として再解析しません。reasoning_contentとtool_callsを明示してください。
+ *   ailiaLLMGetResponseJsonの結果をassistantメッセージとしてそのまま追加できます。
+ *   tool_callsはtype="function"、空でないidとfunction.name、JSONオブジェクトを表す文字列function.argumentsを必要とします。
+ *   idはassistant内で一意とし、後続ターンでは再利用できます。
+ *   tool結果のcontentは文字列、tool_call_idは直前のassistantの呼び出しIDです。
+ *   連続するtool結果は順序ではなくIDで対応付け、ツール名を補います。重複・不一致の結果は拒否します。
+ *   不完全なargumentsは補完・破棄せずエラーとします。GetResponseJsonがPARSE_ERRORの場合は、
+ *   失敗したassistantを追加せず、既存履歴に再試行を指示するuserメッセージを追加してください。
+ *   SetTools(NULL)後も過去のtool_callsとtool結果を入力できます。結果JSONはツール解除前に取得してください。
+ *   入力は呼び出し後に解放できます。成功後はailiaLLMGenerateで生成します。
+ * @return 成功時SUCCESS。不正なJSON・型・ID対応・引数はINVALID_ARGUMENT。
+ *   モデル未読込の場合はINVALID_STATE。
+ *   その他の生成準備エラーはailiaLLMSetPromptと同じです。
  * \~english
- * @brief It destroys the LLM instance.
+ * @brief Sets a prompt from structured JSON conversation history.
  * @param llm A LLM instance pointer
+ * @param messages_json Nonempty UTF-8 JSON message array (null terminated)
+ * @details
+ *   Roles are system/user/assistant/tool; content is a string or null. User content also accepts arrays.
+ *   Parts are {"type":"text","text":"..."}, or type image/audio with exactly one of file_path (local file)
+ *   and data (standard padded Base64 encoded file). JPEG/PNG and WAV/MP3/FLAC are supported by the decoder.
+ *   Media requires a compatible loaded projector. URLs, raw PCM/RGB and video are unsupported.
+ *   Parts retain input order; media history is re-evaluated on each prompt.
+ *   Assistant content is not reparsed as model-specific syntax. Supply reasoning_content and tool_calls explicitly.
+ *   Append the assistant JSON returned by ailiaLLMGetResponseJson directly to the array.
+ *   Each tool call requires type="function", nonempty id and function.name, and function.arguments as a JSON-object string.
+ *   IDs must be unique within an assistant message but may be reused in later turns.
+ *   Tool results require string content and tool_call_id matching the preceding assistant.
+ *   Consecutive results are matched by ID, not position; names are filled in. Duplicate/unmatched results are rejected.
+ *   Incomplete arguments are rejected, never repaired or discarded. If GetResponseJson returns PARSE_ERROR,
+ *   do not append the failed assistant; append a retry user message to the existing history.
+ *   Historical tool calls/results remain accepted after SetTools(NULL). Retrieve response JSON before clearing tools.
+ *   Input can be freed after the call. On success, generate with ailiaLLMGenerate.
+ * @return SUCCESS on success; INVALID_ARGUMENT for invalid JSON, types, ID associations or arguments;
+ *   INVALID_STATE if no model is loaded.
+ *   Other prompt preparation errors are the same as ailiaLLMSetPrompt.
  */
-AILIA_LLM_API void ailiaLLMDestroy(struct AILIALLM* llm);
-    
+AILIA_LLM_API int ailiaLLMSetPromptJson(struct AILIALLM* llm, const char *messages_json);
+
+/**
+ * \~japanese
+ * @brief SDK内部に蓄積した生成結果のassistant JSONサイズを取得します（NULL文字含む）。
+ * @param llm LLMオブジェクト
+ * @param buf_size 必要なバッファサイズ
+ * @details ailiaLLMGetResponseJsonと同じ解析条件・エラーを適用します。
+ * \~english
+ * @brief Gets the buffered assistant JSON size, including the terminating null.
+ * @param llm LLM instance
+ * @param buf_size Required buffer size
+ * @details Same parsing rules and errors as ailiaLLMGetResponseJson.
+ */
+AILIA_LLM_API int ailiaLLMGetResponseJsonSize(struct AILIALLM* llm, unsigned int *buf_size);
+
+/**
+ * \~japanese
+ * @brief SDK内部に蓄積した生成結果を構造化assistant JSONとして取得します。
+ * @param llm LLMオブジェクト
+ * @param json UTF-8出力バッファ
+ * @param buf_size バッファサイズ
+ * @details Generateで生成した出力をSDKが連結します。GetDeltaTextの取得・連結は不要です。
+ *   成功したJSONをSetPromptJsonの履歴配列に追加できます。新しいプロンプトで蓄積をリセットします。
+ *   生成完了後に呼び出してください。未完了の呼び出し/ThinkingはPARSE_ERRORで、補完しません。
+ *   プロンプト未設定やtools/Thinking変更後はINVALID_STATE。生成前は空のassistantを返します。
+ *   NULL引数や不足したバッファはINVALID_ARGUMENTです。取得しても蓄積は消えません。
+ * \~english
+ * @brief Gets structured assistant JSON from output accumulated inside the SDK.
+ * @param llm LLM instance
+ * @param json UTF-8 output buffer
+ * @param buf_size Buffer size
+ * @details No GetDeltaText calls or application-side concatenation are required.
+ *   Append the returned object to SetPromptJson history. A new prompt resets accumulated output.
+ *   Call after generation completes. Unfinished calls/thinking return PARSE_ERROR without repair.
+ *   An unset prompt or changed tools/thinking returns INVALID_STATE. Before generation, returns an empty assistant.
+ *   Null arguments or insufficient buffers return INVALID_ARGUMENT. Reading does not consume the output.
+ */
+AILIA_LLM_API int ailiaLLMGetResponseJson(struct AILIALLM* llm, char *json, unsigned int buf_size);
+
 #ifdef __cplusplus
 }
 #endif

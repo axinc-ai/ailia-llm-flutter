@@ -16,37 +16,69 @@ If a security error occurs with a downloaded file on macOS, please execute the f
 xattr -d com.apple.quarantine macos/libailia_llm.dylib
 ```
 
-## Tool Use (Function Calling)
+## Tool Use (JSON API)
 
-With models whose chat template supports tool calling (e.g. Gemma 4), pass OpenAI-compatible tool definitions with `setTools` and convert the raw output into tool calls with `parseResponse`. Keep the raw output as the `assistant` content of the history and return tool results as the content of messages with role `tool` (matched to the tool calls by order).
+Use `ailiaLLMSetPromptJson` from the first user message while tools are configured.
+The legacy `ailiaLLMSetPrompt` and `ailiaLLMSetMultimodalPrompt` return INVALID_STATE until tools are cleared.
+Define tools with `ailiaLLMSetTools`, set the JSON messages array, and call `ailiaLLMGenerate` until done.
+Deltas remain available through `ailiaLLMGetDeltaText` for previews; retrieving or concatenating them is optional.
+Retrieve assistant JSON with `ailiaLLMGetResponseJsonSize` / `ailiaLLMGetResponseJson`, append the object to history,
+execute complete calls, and append tool results with matching `tool_call_id`. Set the next JSON prompt to continue.
+
+The SDK accumulates generated output. Reads do not consume it; a new prompt resets it.
+
+### Structured history
+
+```json
+[
+ {"role":"user","content":"Weather in Tokyo?"},
+ {"role":"assistant","content":"","tool_calls":[
+  {"id":"call_0","type":"function","function":{"name":"get_weather","arguments":"{\"city\":\"Tokyo\"}"}}
+ ]},
+ {"role":"tool","tool_call_id":"call_0","content":"Snow, -3 C"}
+]
+```
+
+Content is not reparsed as tool syntax. Supply assistant thinking in `reasoning_content`.
+Arguments must be a string containing a JSON object. Call IDs/names must be nonempty; IDs are unique per assistant,
+but may be reused in later turns. Consecutive tool results match the preceding assistant by ID, not order.
+Unknown IDs, duplicate results and conflicting names are rejected. Tool content must be a string; serialize objects first.
+
+### Images and audio
+
+Load a compatible projector with `ailiaLLMOpenMultimodalProjectorFileA` and use ordered user content parts:
+
+```json
+[{"role":"user","content":[
+ {"type":"text","text":"Describe this image and audio."},
+ {"type":"image","file_path":"/path/to/image.jpg"},
+ {"type":"audio","file_path":"/path/to/audio.wav"}
+]}]
+```
+
+Each image/audio part specifies exactly one of `file_path` or `data`. Data is standard padded Base64 containing
+encoded file bytes (JPEG/PNG, WAV/MP3/FLAC, etc.). No URL fetching, video or raw RGB/PCM is supported.
+Media works with or without tools and is re-evaluated each prompt. An unloaded/incompatible projector returns INVALID_STATE.
+Query image/audio support with `ailiaLLMGetMultimodalCapabilities`.
+
+### Incomplete output and errors
+
+GetResponseJson rejects unfinished calls/thinking with PARSE_ERROR. It never repairs arguments or returns executable partial results.
+SetPromptJson rejects incomplete arguments, invalid JSON/types/ID associations and empty arrays with INVALID_ARGUMENT.
+If GetResponseJson returns PARSE_ERROR, do not append the failed assistant. Append a retry user message to the existing history; no partial content/reasoning retrieval is needed. Do not invent tool results.
+
+After clearing tools with SetTools(NULL), SetPromptJson still accepts historical tool calls and results for summaries or final answers. Retrieve response JSON before clearing tools, which invalidates the output parser. Use finally to clear tools even when an exception occurs.
+An unset prompt or changed tools/thinking returns INVALID_STATE; before generation an initialized prompt returns an empty assistant.
+File failures return ERROR_FILE_API, invalid Base64 returns INVALID_ARGUMENT, and undecodable media buffers return ERROR_BUFFER_API.
 
 ```dart
-llm.setTools([
-  {
-    'type': 'function',
-    'function': {
-      'name': 'get_weather',
-      'description': 'Get the current weather of a city.',
-      'parameters': {'type': 'object', 'properties': {'city': {'type': 'string'}}, 'required': ['city']},
-    },
-  },
-]);
-
-final messages = <Map<String, dynamic>>[{'role': 'user', 'content': 'What is the weather in Tokyo?'}];
-llm.setPrompt(messages);
-final raw = StringBuffer();
-String? delta;
-while ((delta = llm.generate()) != null) { raw.write(delta); }
-final response = llm.parseResponse(raw.toString()); // {'role': 'assistant', 'content': '', 'tool_calls': [...]}
-
-messages.add({'role': 'assistant', 'content': raw.toString()}); // raw output as is
-for (final call in (response['tool_calls'] as List? ?? [])) {
-  // execute the tool, then return the result (matched to the tool calls by order)
-  messages.add({'role': 'tool', 'content': 'Sunny, 25C'});
-}
-llm.setPrompt(messages);
-while ((delta = llm.generate()) != null) { print(delta); }
+llm.setPromptJson(messages); // structured List<Map<String, dynamic>>
+while (llm.generate() != null) { /* optional streaming preview */ }
+final response = llm.getResponseJson();
+messages.add(response);
+// Execute response['tool_calls']; append string content with tool_call_id.
 ```
+
 
 ## API specification
 

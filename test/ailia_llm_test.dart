@@ -91,9 +91,9 @@ void main() {
       );
     });
 
-    test('parseResponse throws exception when LLM not initialized', () {
+    test('getResponseJson throws exception when LLM not initialized', () {
       expect(
-        () => model.parseResponse('Hello'),
+        () => model.getResponseJson(),
         throwsException,
       );
     });

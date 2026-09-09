@@ -257,16 +257,10 @@ class AiliaLLMModel {
   ///
   /// The tools are rendered into the prompt through the chat template on the
   /// next [setPrompt] call, the output is constrained to the tool call syntax,
-  /// and the raw output can be converted into tool calls with [parseResponse].
+  /// and the buffered output can be retrieved with [getResponseJson].
   ///
-  /// While tools are set, the messages passed to [setPrompt] are interpreted as:
-  /// - role 'assistant': the raw model output (concatenation of [generate]) as is.
-  ///   It is parsed internally; an Exception is thrown if it does not match the
-  ///   tool call syntax (AILIA_LLM_STATUS_PARSE_ERROR).
-  /// - role 'tool': the tool result as 'content' (a String, or a Map which is
-  ///   serialized as JSON). Tool messages are matched to the tool calls of the
-  ///   preceding assistant message by order.
-  /// A 'tool' message while no tools are set throws an Exception.
+  /// While tools are set, setPrompt fails with INVALID_STATE. Use setPromptJson
+  /// and getResponseJson. Deltas remain available for streaming previews.
   ///
   /// Available for models whose chat template supports tool calling (e.g. Gemma 4).
   void setTools(List<Map<String, dynamic>>? tools) {
@@ -304,44 +298,9 @@ class AiliaLLMModel {
   /// after [setTools] / [setThinking] without a new [setPrompt], throws an
   /// Exception (AILIA_LLM_STATUS_INVALID_STATE). A text that does not match
   /// the tool call syntax (e.g. an unfinished output) throws an Exception
-  /// (AILIA_LLM_STATUS_PARSE_ERROR).
-  Map<String, dynamic> parseResponse(String text) {
-    if (pLLm == nullptr) {
-      throw Exception("ailia LLM not initialized.");
-    }
-
-    Pointer<Char> pText = text.toNativeUtf8().cast<Char>();
-    final Pointer<UnsignedInt> size = malloc<UnsignedInt>();
-    try {
-      int status = dllHandle.ailiaLLMParseResponseSize(pLLm.value, pText, size);
-      if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
-        throw Exception(
-            "ailiaLLMParseResponseSize returned an error status $status");
-      }
-
-      final Pointer<Char> byteBuffer = malloc<Char>(size.value);
-      try {
-        status = dllHandle.ailiaLLMParseResponse(
-            pLLm.value, pText, byteBuffer, size.value);
-        if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
-          throw Exception(
-              "ailiaLLMParseResponse returned an error status $status");
-        }
-
-        var buffer = Uint8List(size.value - 1);
-        for (var i = 0; i < size.value - 1; i++) {
-          buffer[i] = byteBuffer.elementAt(i).value;
-        }
-        return jsonDecode(utf8.decode(buffer)) as Map<String, dynamic>;
-      } finally {
-        malloc.free(byteBuffer);
-      }
-    } finally {
-      malloc.free(size);
-      malloc.free(pText);
-    }
-  }
-
+  /// (AILIA_LLM_STATUS_PARSE_ERROR). No executable partial result is returned;
+  /// arguments are never completed. Empty text returns an empty assistant
+  /// message if the parser state is valid.
   /// Convert the content of a message to the string passed to the native API.
   /// For role 'tool' a Map content is serialized as JSON.
   String _messageContent(Map<String, dynamic> message) {
@@ -352,29 +311,36 @@ class AiliaLLMModel {
     return content as String;
   }
 
-  /// Set the prompt to be processed by the model.
-  /// The prompt will be formatted according to the selected format.
-  ///
-  /// This unified method automatically detects if any message contains
-  /// 'media_data' and routes to the appropriate internal API:
-  /// - If media_data is present: uses SetMultimodalPrompt (requires projector to be loaded)
-  /// - If no media_data: uses SetPrompt (text-only path)
-  ///
-  /// messages must be a list of maps with the following properties:
-  /// - 'role' (String): The role (e.g., "system", "user", "assistant")
-  /// - 'content' (String): The text content of the message
-  /// - 'media_data' (List<Map<String, dynamic>>, optional): Media attachments, each containing:
-  ///   - 'media_type' (String): Type of media (e.g., "image")
-  ///   - 'file_path' (String): Path to the media file
-  ///   - 'width' (int, optional): Media width in pixels
-  ///   - 'height' (int, optional): Media height in pixels
-  ///
-  /// For tool use (see [setTools]) a message with role 'tool' holds a tool
-  /// result as 'content' (String or Map). The raw output of a tool-calling
-  /// turn is kept as the 'assistant' content.
-  ///
-  /// Throws an Exception if media_data is provided but multimodal projector
-  /// is not loaded. Call openMultimodalProjectorFile() first in that case.
+  /// Sets structured JSON history, required with tools. User content arrays
+  /// support text, image/audio with file_path or base64 data; load a projector first.
+  void setPromptJson(List<Map<String, dynamic>> messages) {
+    if (pLLm == nullptr) throw Exception("ailia LLM not initialized.");
+    final text = jsonEncode(messages).toNativeUtf8();
+    try {
+      final status = dllHandle.ailiaLLMSetPromptJson(pLLm.value, text.cast<Char>());
+      _contextFull = status == ailia_llm_dart.AILIA_LLM_STATUS_CONTEXT_FULL;
+      if (status != 0) throw Exception("SetPromptJson failed: $status");
+      _buf = Uint8List(0);
+      _beforeText = "";
+    } finally { malloc.free(text); }
+  }
+
+  /// Gets buffered assistant JSON after generation; no delta concatenation needed.
+  Map<String, dynamic> getResponseJson() {
+    if (pLLm == nullptr) throw Exception("ailia LLM not initialized.");
+    final size = calloc<UnsignedInt>();
+    try {
+      int status = dllHandle.ailiaLLMGetResponseJsonSize(pLLm.value, size);
+      if (status != 0) throw Exception("GetResponseJsonSize failed: $status");
+      final output = malloc<Char>(size.value);
+      try {
+        status = dllHandle.ailiaLLMGetResponseJson(pLLm.value, output, size.value);
+        if (status != 0) throw Exception("GetResponseJson failed: $status");
+        return jsonDecode(output.cast<Utf8>().toDartString()) as Map<String, dynamic>;
+      } finally { malloc.free(output); }
+    } finally { calloc.free(size); }
+  }
+
   void setPrompt(List<Map<String, dynamic>> messages) {
     if (pLLm == nullptr) {
       throw Exception("ailia LLM not initialized.");
