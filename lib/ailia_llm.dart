@@ -20,6 +20,19 @@ class ailiaLlmFFI {
           lookup)
       : _lookup = lookup;
 
+  int ailiaLLMSetPromptJson(ffi.Pointer<AILIALLM> llm, ffi.Pointer<ffi.Char> text) =>
+      _setPromptJson(llm, text);
+  late final _setPromptJson = _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>)>>('ailiaLLMSetPromptJson')
+      .asFunction<int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>)>();
+  int ailiaLLMGetResponseJsonSize(ffi.Pointer<AILIALLM> llm, ffi.Pointer<ffi.UnsignedInt> size) =>
+      _getResponseJsonSize(llm, size);
+  late final _getResponseJsonSize = _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.UnsignedInt>)>>('ailiaLLMGetResponseJsonSize')
+      .asFunction<int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.UnsignedInt>)>();
+  int ailiaLLMGetResponseJson(ffi.Pointer<AILIALLM> llm, ffi.Pointer<ffi.Char> output, int size) =>
+      _getResponseJson(llm, output, size);
+  late final _getResponseJson = _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>, ffi.UnsignedInt)>>('ailiaLLMGetResponseJson')
+      .asFunction<int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>, int)>();
+
   void __va_start(
     ffi.Pointer<va_list> arg0,
   ) {
@@ -143620,12 +143633,61 @@ class ailiaLlmFFI {
               ffi.Pointer<AILIALLMMultimodalChatMessage>, int)>();
 
   /// \~japanese
-  /// @brief LLMオブジェクトを破棄します。
+  /// @brief ツール（関数）の定義を設定します。
   /// @param llm LLMオブジェクトポインタ
+  /// @param tools_json OpenAI互換のツール定義JSON配列（UTF-8）。NULLまたは空文字列で解除します。
+  /// @return
+  /// 成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
+  /// @details
+  /// OpenAI Chat Completions APIのtoolsパラメータと同じ形式でツールを定義します。
+  /// 設定したツールは、次回のailiaLLMSetPromptの呼び出し時にチャットテンプレート経由でプロンプトへ展開されます。
+  /// ツールが設定されている場合、モデルの出力はツール呼び出し構文のgrammarで制約され、
+  /// 生の出力をailiaLLMGetResponseJsonでツール呼び出しを含む構造化データに変換できます。
   ///
   /// \~english
-  /// @brief It destroys the LLM instance.
+  /// @brief Set the tool (function) definitions.
   /// @param llm A LLM instance pointer
+  /// @param tools_json OpenAI-compatible JSON array of tool definitions (UTF-8). Pass NULL or an empty string to clear.
+  /// @return
+  /// If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
+  /// @details
+  /// Tools are defined in the same format as the tools parameter of the OpenAI Chat Completions API.
+  /// The tools are rendered into the prompt through the chat template on the next call to
+  /// ailiaLLMSetPrompt.
+  /// While tools are set, the model output is constrained by a grammar for the tool call syntax, and the
+  /// raw output can be converted into structured data including the tool calls with ailiaLLMGetResponseJson.
+  int ailiaLLMSetTools(
+    ffi.Pointer<AILIALLM> llm,
+    ffi.Pointer<ffi.Char> tools_json,
+  ) {
+    return _ailiaLLMSetTools(
+      llm,
+      tools_json,
+    );
+  }
+
+  late final _ailiaLLMSetToolsPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Int Function(ffi.Pointer<AILIALLM>,
+              ffi.Pointer<ffi.Char>)>>('ailiaLLMSetTools');
+  late final _ailiaLLMSetTools = _ailiaLLMSetToolsPtr
+      .asFunction<int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>)>();
+
+  /// \~japanese
+  /// @brief 生成テキストを構造化した結果のJSONの長さを取得します。(NULL文字含む)
+  /// @param llm       LLMオブジェクトポインタ
+  /// @param text      モデルの生の出力テキスト(UTF8)
+  /// @param buf_size  JSONの長さ
+  /// @return
+  /// 成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
+  ///
+  /// \~english
+  /// @brief Gets the size of the JSON obtained by parsing the generated text. (Include null)
+  /// @param llm       A LLM instance pointer
+  /// @param text      Raw output text of the model (UTF8)
+  /// @param buf_size  The length of the JSON
+  /// @return
+  /// If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
   void ailiaLLMDestroy(
     ffi.Pointer<AILIALLM> llm,
   ) {
@@ -145757,6 +145819,8 @@ const int AILIA_LLM_STATUS_THREAD_ERROR = -6;
 const int AILIA_LLM_STATUS_INVALID_STATE = -7;
 
 const int AILIA_LLM_STATUS_CONTEXT_FULL = -8;
+
+const int AILIA_LLM_STATUS_PARSE_ERROR = -10;
 
 const int AILIA_LLM_STATUS_UNIMPLEMENTED = -15;
 

@@ -234,25 +234,113 @@ class AiliaLLMModel {
     return false;
   }
 
-  /// Set the prompt to be processed by the model.
-  /// The prompt will be formatted according to the selected format.
+  /// Set the tool (function) definitions for tool use (function calling).
   ///
-  /// This unified method automatically detects if any message contains
-  /// 'media_data' and routes to the appropriate internal API:
-  /// - If media_data is present: uses SetMultimodalPrompt (requires projector to be loaded)
-  /// - If no media_data: uses SetPrompt (text-only path)
+  /// [tools] is an OpenAI-compatible list of tool definitions, e.g.
+  /// ```dart
+  /// llm.setTools([
+  ///   {
+  ///     'type': 'function',
+  ///     'function': {
+  ///       'name': 'get_weather',
+  ///       'description': 'Get the current weather',
+  ///       'parameters': {
+  ///         'type': 'object',
+  ///         'properties': {'city': {'type': 'string'}},
+  ///         'required': ['city'],
+  ///       },
+  ///     },
+  ///   },
+  /// ]);
+  /// ```
+  /// Pass null or an empty list to clear the tools.
   ///
-  /// messages must be a list of maps with the following properties:
-  /// - 'role' (String): The role (e.g., "system", "user", "assistant")
-  /// - 'content' (String): The text content of the message
-  /// - 'media_data' (List<Map<String, dynamic>>, optional): Media attachments, each containing:
-  ///   - 'media_type' (String): Type of media (e.g., "image")
-  ///   - 'file_path' (String): Path to the media file
-  ///   - 'width' (int, optional): Media width in pixels
-  ///   - 'height' (int, optional): Media height in pixels
+  /// The tools are rendered into the prompt through the chat template on the
+  /// next [setPrompt] call, the output is constrained to the tool call syntax,
+  /// and the buffered output can be retrieved with [getResponseJson].
   ///
-  /// Throws an Exception if media_data is provided but multimodal projector
-  /// is not loaded. Call openMultimodalProjectorFile() first in that case.
+  /// While tools are set, setPrompt fails with INVALID_STATE. Use setPromptJson
+  /// and getResponseJson. Deltas remain available for streaming previews.
+  ///
+  /// Available for models whose chat template supports tool calling (e.g. Gemma 4).
+  void setTools(List<Map<String, dynamic>>? tools) {
+    if (pLLm == nullptr) {
+      throw Exception("ailia LLM not initialized.");
+    }
+
+    int status;
+    if (tools == null || tools.isEmpty) {
+      status = dllHandle.ailiaLLMSetTools(pLLm.value, nullptr);
+    } else {
+      Pointer<Char> toolsJson = jsonEncode(tools).toNativeUtf8().cast<Char>();
+      status = dllHandle.ailiaLLMSetTools(pLLm.value, toolsJson);
+      malloc.free(toolsJson);
+    }
+    if (status != ailia_llm_dart.AILIA_LLM_STATUS_SUCCESS) {
+      throw Exception("ailiaLLMSetTools returned an error status $status");
+    }
+  }
+
+  /// Parse the raw model output into an OpenAI-compatible assistant message.
+  ///
+  /// [text] is the concatenation of the text returned by [generate].
+  /// The result has the form:
+  /// ```json
+  /// {"role": "assistant", "content": "...", "reasoning_content": "...",
+  ///  "tool_calls": [{"id": "call_0", "type": "function",
+  ///                  "function": {"name": "...", "arguments": "{...}"}}]}
+  /// ```
+  /// 'reasoning_content' is present only when the text contains thinking
+  /// output, and 'tool_calls' only when it contains tool calls.
+  /// 'arguments' is a JSON string.
+  ///
+  /// The parser is built by [setPrompt]; calling this before [setPrompt], or
+  /// after [setTools] / [setThinking] without a new [setPrompt], throws an
+  /// Exception (AILIA_LLM_STATUS_INVALID_STATE). A text that does not match
+  /// the tool call syntax (e.g. an unfinished output) throws an Exception
+  /// (AILIA_LLM_STATUS_PARSE_ERROR). No executable partial result is returned;
+  /// arguments are never completed. Empty text returns an empty assistant
+  /// message if the parser state is valid.
+  /// Convert the content of a message to the string passed to the native API.
+  /// For role 'tool' a Map content is serialized as JSON.
+  String _messageContent(Map<String, dynamic> message) {
+    final content = message['content'];
+    if (message['role'] == 'tool' && content is! String) {
+      return jsonEncode(content);
+    }
+    return content as String;
+  }
+
+  /// Sets structured JSON history, required with tools. User content arrays
+  /// support text, image/audio with file_path or base64 data; load a projector first.
+  void setPromptJson(List<Map<String, dynamic>> messages) {
+    if (pLLm == nullptr) throw Exception("ailia LLM not initialized.");
+    final text = jsonEncode(messages).toNativeUtf8();
+    try {
+      final status = dllHandle.ailiaLLMSetPromptJson(pLLm.value, text.cast<Char>());
+      _contextFull = status == ailia_llm_dart.AILIA_LLM_STATUS_CONTEXT_FULL;
+      if (status != 0) throw Exception("SetPromptJson failed: $status");
+      _buf = Uint8List(0);
+      _beforeText = "";
+    } finally { malloc.free(text); }
+  }
+
+  /// Gets buffered assistant JSON after generation; no delta concatenation needed.
+  Map<String, dynamic> getResponseJson() {
+    if (pLLm == nullptr) throw Exception("ailia LLM not initialized.");
+    final size = calloc<UnsignedInt>();
+    try {
+      int status = dllHandle.ailiaLLMGetResponseJsonSize(pLLm.value, size);
+      if (status != 0) throw Exception("GetResponseJsonSize failed: $status");
+      final output = malloc<Char>(size.value);
+      try {
+        status = dllHandle.ailiaLLMGetResponseJson(pLLm.value, output, size.value);
+        if (status != 0) throw Exception("GetResponseJson failed: $status");
+        return jsonDecode(output.cast<Utf8>().toDartString()) as Map<String, dynamic>;
+      } finally { malloc.free(output); }
+    } finally { calloc.free(size); }
+  }
+
   void setPrompt(List<Map<String, dynamic>> messages) {
     if (pLLm == nullptr) {
       throw Exception("ailia LLM not initialized.");
@@ -291,7 +379,7 @@ class AiliaLLMModel {
           throw Exception("missing 'role' property");
         }
 
-        final content = messages[i]['content'] as String;
+        final content = _messageContent(messages[i]);
         final role = messages[i]['role'] as String;
         final p = messagesPtr[i];
 
@@ -470,7 +558,7 @@ class AiliaLLMModel {
           throw Exception("missing 'role' property");
         }
 
-        final content = messages[i]['content'] as String;
+        final content = _messageContent(messages[i]);
         final role = messages[i]['role'] as String;
         final p = messagesPtr[i];
 
