@@ -20,6 +20,19 @@ class ailiaLlmFFI {
           lookup)
       : _lookup = lookup;
 
+  int ailiaLLMSetPromptJson(ffi.Pointer<AILIALLM> llm, ffi.Pointer<ffi.Char> text) =>
+      _setPromptJson(llm, text);
+  late final _setPromptJson = _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>)>>('ailiaLLMSetPromptJson')
+      .asFunction<int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>)>();
+  int ailiaLLMGetResponseJsonSize(ffi.Pointer<AILIALLM> llm, ffi.Pointer<ffi.UnsignedInt> size) =>
+      _getResponseJsonSize(llm, size);
+  late final _getResponseJsonSize = _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.UnsignedInt>)>>('ailiaLLMGetResponseJsonSize')
+      .asFunction<int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.UnsignedInt>)>();
+  int ailiaLLMGetResponseJson(ffi.Pointer<AILIALLM> llm, ffi.Pointer<ffi.Char> output, int size) =>
+      _getResponseJson(llm, output, size);
+  late final _getResponseJson = _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>, ffi.UnsignedInt)>>('ailiaLLMGetResponseJson')
+      .asFunction<int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>, int)>();
+
   void __va_start(
     ffi.Pointer<va_list> arg0,
   ) {
@@ -143629,7 +143642,7 @@ class ailiaLlmFFI {
   /// OpenAI Chat Completions APIのtoolsパラメータと同じ形式でツールを定義します。
   /// 設定したツールは、次回のailiaLLMSetPromptの呼び出し時にチャットテンプレート経由でプロンプトへ展開されます。
   /// ツールが設定されている場合、モデルの出力はツール呼び出し構文のgrammarで制約され、
-  /// 生の出力をailiaLLMParseResponseでツール呼び出しを含む構造化データに変換できます。
+  /// 生の出力をailiaLLMGetResponseJsonでツール呼び出しを含む構造化データに変換できます。
   ///
   /// \~english
   /// @brief Set the tool (function) definitions.
@@ -143642,7 +143655,7 @@ class ailiaLlmFFI {
   /// The tools are rendered into the prompt through the chat template on the next call to
   /// ailiaLLMSetPrompt.
   /// While tools are set, the model output is constrained by a grammar for the tool call syntax, and the
-  /// raw output can be converted into structured data including the tool calls with ailiaLLMParseResponse.
+  /// raw output can be converted into structured data including the tool calls with ailiaLLMGetResponseJson.
   int ailiaLLMSetTools(
     ffi.Pointer<AILIALLM> llm,
     ffi.Pointer<ffi.Char> tools_json,
@@ -143675,77 +143688,6 @@ class ailiaLlmFFI {
   /// @param buf_size  The length of the JSON
   /// @return
   /// If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
-  int ailiaLLMParseResponseSize(
-    ffi.Pointer<AILIALLM> llm,
-    ffi.Pointer<ffi.Char> text,
-    ffi.Pointer<ffi.UnsignedInt> buf_size,
-  ) {
-    return _ailiaLLMParseResponseSize(
-      llm,
-      text,
-      buf_size,
-    );
-  }
-
-  late final _ailiaLLMParseResponseSizePtr = _lookup<
-      ffi.NativeFunction<
-          ffi.Int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>,
-              ffi.Pointer<ffi.UnsignedInt>)>>('ailiaLLMParseResponseSize');
-  late final _ailiaLLMParseResponseSize =
-      _ailiaLLMParseResponseSizePtr.asFunction<
-          int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>,
-              ffi.Pointer<ffi.UnsignedInt>)>();
-
-  /// \~japanese
-  /// @brief モデルの生の出力テキストを解析し、OpenAI互換のassistantメッセージJSONに変換します。
-  /// @param llm       LLMオブジェクトポインタ
-  /// @param text      モデルの生の出力テキスト(UTF8)
-  /// @param json      JSON(UTF8)
-  /// @param buf_size  バッファサイズ
-  /// @return
-  /// 成功した場合は \ref AILIA_LLM_STATUS_SUCCESS 、そうでなければエラーコードを返す。
-  /// @details
-  /// {"role":"assistant","content":"...","reasoning_content":"...","tool_calls":[...]} の形式で返します。
-  ///
-  /// \~english
-  /// @brief Parses the raw output text of the model into an OpenAI-compatible assistant message JSON.
-  /// @param llm       A LLM instance pointer
-  /// @param text      Raw output text of the model (UTF8)
-  /// @param json      JSON(UTF8)
-  /// @param buf_size  Buffer size
-  /// @return
-  /// If this function is successful, it returns  \ref AILIA_LLM_STATUS_SUCCESS , or an error code otherwise.
-  /// @details
-  /// Returns {"role":"assistant","content":"...","reasoning_content":"...","tool_calls":[...]}.
-  int ailiaLLMParseResponse(
-    ffi.Pointer<AILIALLM> llm,
-    ffi.Pointer<ffi.Char> text,
-    ffi.Pointer<ffi.Char> json,
-    int buf_size,
-  ) {
-    return _ailiaLLMParseResponse(
-      llm,
-      text,
-      json,
-      buf_size,
-    );
-  }
-
-  late final _ailiaLLMParseResponsePtr = _lookup<
-      ffi.NativeFunction<
-          ffi.Int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>,
-              ffi.Pointer<ffi.Char>, ffi.UnsignedInt)>>('ailiaLLMParseResponse');
-  late final _ailiaLLMParseResponse = _ailiaLLMParseResponsePtr.asFunction<
-      int Function(ffi.Pointer<AILIALLM>, ffi.Pointer<ffi.Char>,
-          ffi.Pointer<ffi.Char>, int)>();
-
-  /// \~japanese
-  /// @brief LLMオブジェクトを破棄します。
-  /// @param llm LLMオブジェクトポインタ
-  ///
-  /// \~english
-  /// @brief It destroys the LLM instance.
-  /// @param llm A LLM instance pointer
   void ailiaLLMDestroy(
     ffi.Pointer<AILIALLM> llm,
   ) {
