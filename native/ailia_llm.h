@@ -483,13 +483,6 @@ AILIA_LLM_API int ailiaLLMSetThinking(struct AILIALLM* llm, unsigned int enable)
  */
 AILIA_LLM_API int ailiaLLMSetPrompt(struct AILIALLM* llm, const AILIALLMChatMessage * message, unsigned int message_cnt);
 
-
-
-
-
-
-
-
 /**
  * \~japanese
  * @brief 生成を行います。
